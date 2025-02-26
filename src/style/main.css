@@ -1,0 +1,121 @@
+body {
+    margin: 0;
+    overflow: hidden;
+}
+
+canvas {
+    display: block;
+}
+
+body {
+    background-image: url("/src/images/night-city-dalle.jpg");
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-position: center;
+    height: 100vh; /* Ensure the background fills the entire viewport */
+    margin: 0; /* Remove any default margins */
+}
+
+
+textarea {
+    width: 100%;
+    height: 150px;
+    background: #0d0d0d; /* Dark background */
+    color: #00ffea; /* Neon cyan text */
+    font-family: 'Orbitron', sans-serif; /* Futuristic font */
+    font-size: 16px;
+    padding: 10px;
+    border: 2px solid #00ffea; /* Neon border */
+    outline: none;
+    resize: none;
+    border-radius: 5px;
+    box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
+    transition: 0.3s;
+}
+
+/* Glow effect on focus */
+textarea:focus {
+    border-color: #ff00ff; /* Pink neon when active */
+    box-shadow: 0 0 10px #ff00ff, 0 0 25px rgba(255, 0, 255, 0.5);
+}
+
+/* Scrollbar styling */
+textarea::-webkit-scrollbar {
+    width: 8px;
+}
+textarea::-webkit-scrollbar-thumb {
+    background: #00ffea;
+    border-radius: 4px;
+}
+textarea::-webkit-scrollbar-track {
+    background: #222;
+}
+
+/* Add a subtle animation */
+@keyframes neonPulse {
+    0% { box-shadow: 0 0 8px #00ffea; }
+    50% { box-shadow: 0 0 15px #00ffea; }
+    100% { box-shadow: 0 0 8px #00ffea; }
+}
+textarea:hover {
+    animation: neonPulse 1.5s infinite alternate;
+}
+
+
+#inputField {
+    position: absolute;
+    right: 150px;
+    bottom: 50px;
+    width: 400px;
+    height: 50px;
+    resize: none;
+}
+
+.mic {
+    position: absolute;
+    right: 50px;
+    bottom: 50px;
+}
+
+/* Base button styles */
+button.mic, button.recording {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    padding: 12px 24px;
+    width: 74px;
+    height: 74px;
+    border-radius: 5px;
+    outline: none;
+    cursor: pointer;
+    text-transform: uppercase;
+    overflow: hidden;
+    transition: 0.3s ease-in-out;
+}
+
+/* Idle microphone button */
+button.mic {
+    background: #0d0d0d; /* Dark background */
+    color: #00ffea; /* Neon cyan text */
+    border: 2px solid #00ffea; /* Neon cyan border */
+    box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
+}
+
+button.mic:hover {
+    border-color: #ff00ff; /* Pink neon on hover */
+    box-shadow: 0 0 10px #ff00ff, 0 0 25px rgba(255, 0, 255, 0.5);
+}
+
+/* Active recording button */
+button.recording {
+    background: #ff0000; /* Red background */
+    color: #fff;
+    border: 2px solid #ff3300; /* Glowing red */
+    box-shadow: 0 0 12px #ff3300, 0 0 30px rgba(255, 51, 0, 0.8);
+    animation: pulseGlow 1s infinite alternate;
+}
+
+/* Glow animation for recording state */
+@keyframes pulseGlow {
+    0% { box-shadow: 0 0 10px #ff3300, 0 0 20px rgba(255, 51, 0, 0.6); }
+    100% { box-shadow: 0 0 18px #ff6600, 0 0 35px rgba(255, 102, 0, 0.8); }
+}

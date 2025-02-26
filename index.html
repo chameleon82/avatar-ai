@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Avatar with OpenAI and TTS</title>
+    <link rel="stylesheet" href="src/style/main.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.136/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+    <!-- Link to the external openai-key.js -->
+    <script src="openai-key.js"></script> <!-- This file contains the API key -->
+    <script src="src/js/pcm16Audio.js"></script>
+
+    <!--<script src="https://cdn.jsdelivr.net/npm/meyda@5.0.0/dist/web/meyda.min.js"></script> -->
+</head>
+<body>
+<label for="inputField"></label><textarea name="text" id="inputField"></textarea>
+<button id="mic" class="mic">🎤</button>
+
+<script>
+    let scene, camera, renderer, avatar, leftEye, rightEye;
+    let currentViseme = "sil"
+    let eyeBlinkProgress = 0;
+    let blinkSpeed = 0.2;
+    let blinkingDirection = 1;
+    let lastBlinkTime = 0;
+    let blinkCooldown = 5000;
+    let head;
+    let mouthMesh;
+    let wolfAvatar;
+    let socket;
+
+    function convertWordToPhonemes(word) {
+        const phonemeRules = [
+            {pattern: /^sh/, phoneme: "ʃ"}, // "sh" -> /ʃ/
+            {pattern: /^ch/, phoneme: "ʧ"}, // "ch" -> /ʧ/
+            {pattern: /^th/, phoneme: "θ"}, // "th" -> /θ/
+            {pattern: /^ea/, phoneme: "iː"}, // "ea" -> /iː/
+            {pattern: /^oo/, phoneme: "uː"}, // "oo" -> /uː/
+            {pattern: /^oo/, phoneme: "ʊ"}, // "oo" -> /ʊ/ for "book"
+            {pattern: /a/, phoneme: "æ"},   // "a" -> /æ/
+            {pattern: /e/, phoneme: "ɛ"},   // "e" -> /ɛ/
+            {pattern: /i/, phoneme: "ɪ"},   // "i" -> /ɪ/
+            {pattern: /o/, phoneme: "ɒ"},   // "o" -> /ɒ/
+            {pattern: /u/, phoneme: "ʌ"},   // "u" -> /ʌ/
+            {pattern: /p/, phoneme: "p"},   // "p" -> /p/
+            {pattern: /b/, phoneme: "b"},   // "b" -> /b/
+            {pattern: /t/, phoneme: "t"},   // "t" -> /t/
+            {pattern: /d/, phoneme: "d"},   // "d" -> /d/
+            {pattern: /k/, phoneme: "k"},   // "k" -> /k/
+            {pattern: /g/, phoneme: "g"},   // "g" -> /g/
+            {pattern: /l/, phoneme: "l"},   // "l" -> /l/
+            {pattern: /r/, phoneme: "r"},   // "r" -> /r/
+            {pattern: /m/, phoneme: "m"},   // "m" -> /m/
+            {pattern: /n/, phoneme: "n"},   // "n" -> /n/
+            {pattern: /s/, phoneme: "s"},   // "s" -> /s/
+            {pattern: /z/, phoneme: "z"},   // "z" -> /z/
+            {pattern: /f/, phoneme: "f"},   // "f" -> /f/
+            {pattern: /v/, phoneme: "v"},   // "v" -> /v/
+        ];
+
+        let phonemes = [];
+        word = word.toLowerCase();
+
+        let remainingWord = word;
+        while (remainingWord.length > 0) {
+            let matched = false;
+            for (let rule of phonemeRules) {
+                if (remainingWord.startsWith(rule.pattern.source)) {
+                    phonemes.push(rule.phoneme);
+                    remainingWord = remainingWord.slice(rule.pattern.source.length);
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                phonemes.push(remainingWord[0]);  // Add the letter as is if no rule matches
+                remainingWord = remainingWord.slice(1);
+            }
+        }
+
+        return phonemes.join(" ");
+    }
+
+
+    function mapPhonemesToVisemes(phonemes) {
+        const visemeMapping = {
+            "ʃ": "CH",
+            "ʧ": "CH",
+            "θ": "TH",
+            "iː": "I",
+            "uː": "U",
+            "ʊ": "U",
+            "æ": "aa",
+            "ɛ": "E",
+            "ɪ": "I",
+            "ɒ": "O",
+            "ʌ": "U",
+            "p": "PP",
+            "b": "PP",
+            "t": "DD",
+            "d": "DD",
+            "k": "kk",
+            "g": "kk",
+            "l": "RR",
+            "r": "RR",
+            "m": "nn",
+            "n": "nn",
+            "s": "SS",
+            "z": "SS",
+            "f": "FF",
+            "v": "FF"
+        };
+
+        // Ensure phonemes is an array, if it's not, turn it into one
+        if (!Array.isArray(phonemes)) {
+            phonemes = [phonemes];
+        }
+
+        return phonemes.map(phoneme => visemeMapping[phoneme] || "Unknown Viseme " + phoneme);
+    }
+
+
+    async function init() {
+
+        const inputField = document.getElementById('inputField');
+
+        function onEnterKey(event) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                // Trigger the function or submit button action
+                if (inputField.value !== "") {
+                    onUserInput(inputField.value);
+                    inputField.value = "";
+                }
+            }
+        }
+
+        inputField.addEventListener('keydown', onEnterKey);
+
+
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(15, window.innerWidth / window.innerHeight, 0.01, 100);
+        camera.position.set(0, 0, 2);
+
+        renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        window.addEventListener('resize', () => {
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            // Update camera aspect ratio and other settings if necessary
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+        });
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1.2);
+        directionalLight.position.set(100, 100, 100).normalize();
+        scene.add(directionalLight);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        const loader = new THREE.GLTFLoader();
+        // https://demo.readyplayer.me/avatar?id=67bd3923758ea27bb2ef2f37
+        loader.load(
+            './avatar.glb',
+            function (gltf) {
+                avatar = gltf.scene;
+                avatar.position.set(0, -1.7, 0);
+                scene.add(avatar);
+                mouthMesh = avatar.getObjectByName('Mouth'); // Assuming this is the mouth mesh
+
+                avatar.traverse(function (child) {
+                    if (child.name.toLowerCase() === 'head') {
+                        head = child;
+                    }
+                    if (child.name.toLowerCase() === 'lefteye') {
+                        leftEye = child;
+                    }
+                    if (child.name.toLowerCase() === 'righteye') {
+                        rightEye = child;
+                    }
+                    if (child.name === 'Wolf3D_Avatar') {
+                        console.log(child)
+                        wolfAvatar = child;
+                        wolfAvatar.morphTargetInfluences[wolfAvatar.morphTargetDictionary.mouthSmile] = 0.3
+                    }
+                });
+
+                if (leftEye && rightEye) {
+                    console.debug('Left and Right eyes found!');
+                }
+
+            },
+            undefined,
+            function (error) {
+                console.error('Error loading GLB file:', error);
+            }
+        );
+
+        animate();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        animateMouthSmoothly();
+        animateEyes()
+        renderer.render(scene, camera);
+    }
+
+    function animateEyes() {
+        if (socket != null && socket.readyState !== WebSocket.OPEN) {
+            if (leftEye && rightEye) {
+                leftEye.scale.y = 0.0;
+                rightEye.scale.y = 0.0;
+            }
+            return;
+        }
+        const currentTime = Date.now();
+        if (currentTime - lastBlinkTime >= blinkCooldown) {
+            if (leftEye && rightEye) {
+                eyeBlinkProgress += blinkSpeed * blinkingDirection;
+
+                if (eyeBlinkProgress >= 1) {
+                    blinkingDirection = -1;
+                }
+                if (eyeBlinkProgress <= 0) {
+                    blinkingDirection = 1;
+                    lastBlinkTime = currentTime;
+                }
+
+                leftEye.scale.y = Math.max(0.0, 1 - eyeBlinkProgress);
+                rightEye.scale.y = Math.max(0.0, 1 - eyeBlinkProgress);
+            }
+        }
+    }
+
+    function animateMouthSmoothly() {
+        if (wolfAvatar && wolfAvatar.morphTargetDictionary) {
+            wolfAvatar.mouthSmileLeft = 1
+            const targetIndex = wolfAvatar.morphTargetDictionary['viseme_' + currentViseme];
+            // Reset all other visemes gradually
+            Object.keys(wolfAvatar.morphTargetDictionary).forEach((visemeKey) => {
+                const index = wolfAvatar.morphTargetDictionary[visemeKey];
+                if (index !== targetIndex && visemeKey.startsWith("viseme_")) {
+                    if (wolfAvatar.morphTargetInfluences[index] > 0) {
+                        wolfAvatar.morphTargetInfluences[index] = Math.max(0, wolfAvatar.morphTargetInfluences[index] - 0.1); // Fade-out
+                    }
+                }
+            });
+            if (targetIndex !== undefined) {
+                if (wolfAvatar.morphTargetInfluences[targetIndex] < 1) {
+                    wolfAvatar.morphTargetInfluences[targetIndex] = Math.min(1, wolfAvatar.morphTargetInfluences[targetIndex] + 0.1); // Fade-in
+                }
+            }
+        }
+    }
+
+
+    function animateWord(word) {
+        const phonemes = convertWordToPhonemes(word).split(" ");
+        let index = 0;
+
+        function animateNextViseme() {
+            if (index < phonemes.length) {
+                index++;
+                currentViseme = mapPhonemesToVisemes(phonemes[index]);
+                setTimeout(animateNextViseme, 40);
+            }
+        }
+
+        animateNextViseme();
+    }
+
+    function speak(text) {
+        const synth = window.speechSynthesis;
+        const utterance = new SpeechSynthesisUtterance(text);
+
+        let voices = synth.getVoices();
+        if (voices.length === 0) {
+            synth.onvoiceschanged = () => {
+                voices = synth.getVoices();
+                setMaleVoice(utterance, voices);
+            };
+        } else {
+            setMaleVoice(utterance, voices);
+        }
+
+        utterance.onboundary = function (event) {
+            // For example, trigger mouth animation when phoneme is reached
+            if (event.name === 'word') {
+                //   const txt = event.target.text.substring(event.charIndex, event.charIndex + event.charLength)
+                //   animateWord(txt)
+            }
+        };
+
+        utterance.onstart = function () {
+            // Take a breathe before speakin`
+            currentViseme = 'AA'
+        };
+
+        utterance.onend = function () {
+            currentViseme = 'sil'
+        };
+
+        synth.speak(utterance);
+    }
+
+    function setMaleVoice(utterance, voices) {
+        // Try to find an English male voice
+        const maleVoice = voices.find(voice => {
+                // reed,eddy, google
+                return voice.lang.startsWith('en') && voice.name.toLowerCase().includes('alex');
+            }
+        );
+
+        if (maleVoice) {
+            console.debug(maleVoice)
+            utterance.voice = maleVoice;
+        } else {
+            console.warn('No male voice found, using default');
+        }
+    }
+
+
+    socket = new WebSocket(
+        "wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview-2024-12-17",
+        [
+            "realtime",
+            // Auth
+            "openai-insecure-api-key." + openaiApiKey,
+            // Beta protocol, required
+            "openai-beta.realtime-v1"
+        ]);
+
+    socket.onopen = () => {
+        console.debug("Connected to OpenAI WebSocket");
+        const event = {
+            "event_id": "event_123",
+            "type": "session.update",
+            "session": {
+                "modalities": ["text", "audio"],
+                "instructions": "You are a helpful AI assistant from 2077 Cyberpunk. You must speak only in English and not answering in any other language",
+                "voice": "ash",
+                "input_audio_format": "pcm16",
+                "output_audio_format": "pcm16",
+                "input_audio_transcription": {
+                    "model": "whisper-1"
+                },
+                "turn_detection": {
+                    "type": "server_vad",
+                    "threshold": 0.5,
+                    "prefix_padding_ms": 300,
+                    "silence_duration_ms": 500,
+                    "create_response": true
+                },
+                "tools": [
+                    {
+                        type: "function",
+                        name: "apply_some_function",
+                        description: "Some function to apply",
+                        parameters: {
+                            type: "object",
+                            properties: {
+                                "param": {"type": "string"},
+                            },
+                            required: ["param"]
+                        }
+                    }
+                ],
+                "tool_choice": "auto",
+                "temperature": 0.8,
+                "max_response_output_tokens": "inf"
+            }
+        }
+
+        socket.send(JSON.stringify(event));
+    }
+    socket.onmessage = (event) => {
+        let response = JSON.parse(event.data)
+        //console.log(response)
+        if (response["type"] === "response.audio_transcript.delta") {
+            // animateWord(response["delta"]) // not synced
+        } else if (response["type"] === "response.audio_transcript.done") {
+            //console.log(response)
+            //     speak(response["transcript"])
+        } else if (response["type"] === "response.audio.delta") {
+            const binaryData = atob(response["delta"]); // Decode base64 to raw binary string
+            recorder.addPlayChunk(bytesToPcm(binaryData))
+        } else {
+            //  console.log("AI Response:", event.data);
+        }
+
+    }
+    socket.onclose = () => {
+        console.debug("Disconnected from OpenAI WebSocket");
+    }
+    socket.onerror = (error) => console.error("WebSocket Error:", error);
+
+
+    async function onUserInput(input) {
+        const event = {
+            "type": "conversation.item.create",
+            "previous_item_id": null,
+            "item": {
+                "type": "message",
+                "role": "user",
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": input
+                    }
+                ]
+            }
+        }
+        socket.send(JSON.stringify(event));
+        socket.send(JSON.stringify({type: "response.create"}));
+    }
+
+    function bytesToPcm(binaryData) {
+        const pcm16Data = new Int16Array(binaryData.length / 2); // PCM16 is 2 bytes per sample
+        // Convert the binary data to Int16Array (16-bit PCM)
+        for (let i = 0; i < pcm16Data.length; i++)
+            pcm16Data[i] = (binaryData.charCodeAt(i * 2 + 1) << 8) | binaryData.charCodeAt(i * 2);
+        return pcm16Data
+    }
+
+    const recorder = new PCM16Audio(chunk => {
+        //if (socket.readyState === WebSocket.OPEN) {
+        const byteArray = new Uint8Array(chunk.length * 2);
+        for (let i = 0; i < chunk.length; i++) {
+            // Convert each 16-bit integer to two 8-bit values (Little Endian format)
+            const int16Value = chunk[i];
+            byteArray[i * 2] = int16Value & 0xFF; // Low byte
+            byteArray[i * 2 + 1] = (int16Value >> 8) & 0xFF; // High byte
+        }
+        // Convert the byte array to a string of characters for base64 encoding
+        const byteString = String.fromCharCode.apply(null, byteArray);
+        // redirect to processing
+//        recorder.addPlayChunk(bytesToPcm(byteString)) // send mic instead for testing
+        socket.send(JSON.stringify(
+            {
+                "event_id": "event_456",
+                "type": "input_audio_buffer.append",
+                "audio": btoa(byteString)
+            }
+        )); // Send raw PCM16 binary data
+    }, viseme => {
+        if (viseme) currentViseme = viseme; else currentViseme = "sil"
+    });
+
+    document.getElementById('mic').addEventListener('click', () => {
+        const recClass = "recording"
+        const el = document.getElementById('mic').classList
+        if (!el.contains(recClass)) {
+            el.add(recClass)
+            return recorder.start()
+        } else {
+            el.remove(recClass)
+            return recorder.stop()
+        }
+    });
+
+    window.onload = init;
+</script>
+</body>
+</html>
