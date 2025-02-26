@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Avatar with OpenAI and TTS</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            display: block;
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.136/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+    <!-- Link to the external openai-key.js -->
+    <script src="openai-key.js"></script> <!-- This file contains the API key -->
+</head>
+<body>
+
+<script>
+    let scene, camera, renderer, avatar, leftEye, rightEye;
+    let currentViseme = "sil"
+    let eyeBlinkProgress = 0;
+    let blinkSpeed = 0.2;
+    let blinkingDirection = 1;
+    let lastBlinkTime = 0;
+    let blinkCooldown = 5000;
+    let head;
+    let mouthMesh;
+    let wolfAvatar;
+
+    function convertWordToPhonemes(word) {
+        const phonemeRules = [
+            {pattern: /^sh/, phoneme: "ʃ"}, // "sh" -> /ʃ/
+            {pattern: /^ch/, phoneme: "ʧ"}, // "ch" -> /ʧ/
+            {pattern: /^th/, phoneme: "θ"}, // "th" -> /θ/
+            {pattern: /^ea/, phoneme: "iː"}, // "ea" -> /iː/
+            {pattern: /^oo/, phoneme: "uː"}, // "oo" -> /uː/
+            {pattern: /^oo/, phoneme: "ʊ"}, // "oo" -> /ʊ/ for "book"
+            {pattern: /a/, phoneme: "æ"},   // "a" -> /æ/
+            {pattern: /e/, phoneme: "ɛ"},   // "e" -> /ɛ/
+            {pattern: /i/, phoneme: "ɪ"},   // "i" -> /ɪ/
+            {pattern: /o/, phoneme: "ɒ"},   // "o" -> /ɒ/
+            {pattern: /u/, phoneme: "ʌ"},   // "u" -> /ʌ/
+            {pattern: /p/, phoneme: "p"},   // "p" -> /p/
+            {pattern: /b/, phoneme: "b"},   // "b" -> /b/
+            {pattern: /t/, phoneme: "t"},   // "t" -> /t/
+            {pattern: /d/, phoneme: "d"},   // "d" -> /d/
+            {pattern: /k/, phoneme: "k"},   // "k" -> /k/
+            {pattern: /g/, phoneme: "g"},   // "g" -> /g/
+            {pattern: /l/, phoneme: "l"},   // "l" -> /l/
+            {pattern: /r/, phoneme: "r"},   // "r" -> /r/
+            {pattern: /m/, phoneme: "m"},   // "m" -> /m/
+            {pattern: /n/, phoneme: "n"},   // "n" -> /n/
+            {pattern: /s/, phoneme: "s"},   // "s" -> /s/
+            {pattern: /z/, phoneme: "z"},   // "z" -> /z/
+            {pattern: /f/, phoneme: "f"},   // "f" -> /f/
+            {pattern: /v/, phoneme: "v"},   // "v" -> /v/
+        ];
+
+        let phonemes = [];
+        word = word.toLowerCase();
+
+        let remainingWord = word;
+        while (remainingWord.length > 0) {
+            let matched = false;
+            for (let rule of phonemeRules) {
+                if (remainingWord.startsWith(rule.pattern.source)) {
+                    phonemes.push(rule.phoneme);
+                    remainingWord = remainingWord.slice(rule.pattern.source.length);
+                    matched = true;
+                    break;
+                }
+            }
+            if (!matched) {
+                phonemes.push(remainingWord[0]);  // Add the letter as is if no rule matches
+                remainingWord = remainingWord.slice(1);
+            }
+        }
+
+        return phonemes.join(" ");
+    }
+
+
+    function mapPhonemesToVisemes(phonemes) {
+        const visemeMapping = {
+            "ʃ": "CH",
+            "ʧ": "CH",
+            "θ": "TH",
+            "iː": "I",
+            "uː": "U",
+            "ʊ": "U",
+            "æ": "aa",
+            "ɛ": "E",
+            "ɪ": "I",
+            "ɒ": "O",
+            "ʌ": "U",
+            "p": "PP",
+            "b": "PP",
+            "t": "DD",
+            "d": "DD",
+            "k": "kk",
+            "g": "kk",
+            "l": "RR",
+            "r": "RR",
+            "m": "nn",
+            "n": "nn",
+            "s": "SS",
+            "z": "SS",
+            "f": "FF",
+            "v": "FF"
+        };
+
+        // Ensure phonemes is an array, if it's not, turn it into one
+        if (!Array.isArray(phonemes)) {
+            phonemes = [phonemes];
+        }
+
+        return phonemes.map(phoneme => visemeMapping[phoneme] || "Unknown Viseme " + phoneme);
+    }
+
+
+    async function init() {
+
+        const inputField = document.getElementById('inputField');
+
+        function onEnterKey(event) {
+            if (event.key === 'Enter') {
+                // Trigger the function or submit button action
+                if (inputField.value !== "") {
+                    onUserInput(inputField.value);
+                }
+                inputField.value = "";
+            }
+        }
+
+        inputField.addEventListener('keydown', onEnterKey);
+
+
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(10, window.innerWidth / window.innerHeight, 0.01, 100);
+        camera.position.set(0, 0, 2);
+
+        renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        const ambientLight = new THREE.AmbientLight(0xffffff, 2);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 3);
+        directionalLight.position.set(1, 1, 1).normalize();
+        scene.add(directionalLight);
+
+        const controls = new THREE.OrbitControls(camera, renderer.domElement);
+        controls.enableDamping = true;
+        controls.dampingFactor = 0.05;
+
+        const loader = new THREE.GLTFLoader();
+        // https://demo.readyplayer.me/avatar?id=67bd3923758ea27bb2ef2f37
+        loader.load(
+            './avatar.glb',
+            function (gltf) {
+                avatar = gltf.scene;
+                avatar.position.set(0, -1.7, 0);
+                scene.add(avatar);
+                mouthMesh = avatar.getObjectByName('Mouth'); // Assuming this is the mouth mesh
+
+                avatar.traverse(function (child) {
+                    if (child.name.toLowerCase() === 'head') {
+                        head = child;
+                    }
+                    if (child.name.toLowerCase() === 'lefteye') {
+                        leftEye = child;
+                    }
+                    if (child.name.toLowerCase() === 'righteye') {
+                        rightEye = child;
+                    }
+                    if (child.name === 'Wolf3D_Avatar') {
+                        console.log(child)
+                        wolfAvatar = child;
+                        wolfAvatar.morphTargetInfluences[wolfAvatar.morphTargetDictionary.mouthSmile] = 0.3
+                    }
+                });
+
+                if (leftEye && rightEye) {
+                    console.log('Left and Right eyes found!');
+                }
+
+                // Call onUserInput after avatar is loaded
+                onUserInput("Hello, Avatar! How are you?");
+            },
+            undefined,
+            function (error) {
+                console.error('Error loading GLB file:', error);
+            }
+        );
+
+        animate();
+    }
+
+    function animate() {
+        requestAnimationFrame(animate);
+        animateMouthSmoothly();
+
+        const currentTime = Date.now();
+
+        if (currentTime - lastBlinkTime >= blinkCooldown) {
+            if (leftEye && rightEye) {
+                eyeBlinkProgress += blinkSpeed * blinkingDirection;
+
+                if (eyeBlinkProgress >= 1) {
+                    blinkingDirection = -1;
+                }
+                if (eyeBlinkProgress <= 0) {
+                    blinkingDirection = 1;
+                    lastBlinkTime = currentTime;
+                }
+
+                leftEye.scale.y = Math.max(0.0, 1 - eyeBlinkProgress);
+                rightEye.scale.y = Math.max(0.0, 1 - eyeBlinkProgress);
+            }
+        }
+
+        renderer.render(scene, camera);
+    }
+
+
+    function animateMouthSmoothly() {
+        if (wolfAvatar && wolfAvatar.morphTargetDictionary) {
+            wolfAvatar.mouthSmileLeft = 1
+            const targetIndex = wolfAvatar.morphTargetDictionary['viseme_' + currentViseme];
+            // Reset all other visemes gradually
+            Object.keys(wolfAvatar.morphTargetDictionary).forEach((visemeKey) => {
+                const index = wolfAvatar.morphTargetDictionary[visemeKey];
+                if (index !== targetIndex && visemeKey.startsWith("viseme_")) {
+                    if (wolfAvatar.morphTargetInfluences[index] > 0) {
+                        wolfAvatar.morphTargetInfluences[index] = Math.max(0, wolfAvatar.morphTargetInfluences[index] - 0.1); // Fade-out
+                    }
+                }
+            });
+            if (targetIndex !== undefined) {
+                if (wolfAvatar.morphTargetInfluences[targetIndex] < 1) {
+                    wolfAvatar.morphTargetInfluences[targetIndex] = Math.min(1, wolfAvatar.morphTargetInfluences[targetIndex] + 0.1); // Fade-in
+                }
+            }
+        }
+    }
+
+    // viseme_CH: 7
+    // viseme_DD: 5
+    // viseme_E: 12
+    // viseme_FF: 3
+    // viseme_I: 13
+    // viseme_O: 14
+    // viseme_PP: 2
+    // viseme_RR: 10
+    // viseme_SS: 8
+    // viseme_TH: 4
+    // viseme_U: 15
+    // viseme_aa: 11
+    // viseme_kk: 6
+    // viseme_nn: 9
+
+
+    function speak(text) {
+        const synth = window.speechSynthesis;
+        const utterance = new SpeechSynthesisUtterance(text);
+
+        let voices = synth.getVoices();
+        if (voices.length === 0) {
+            synth.onvoiceschanged = () => {
+                voices = synth.getVoices();
+                setMaleVoice(utterance, voices);
+            };
+        } else {
+            setMaleVoice(utterance, voices);
+        }
+
+        utterance.onboundary = function (event) {
+            // For example, trigger mouth animation when phoneme is reached
+            if (event.name === 'word') {
+                const txt = event.target.text.substring(event.charIndex, event.charIndex + event.charLength)
+                const phonemes = convertWordToPhonemes(txt).split(" ");
+                let index = 0;
+                function animateNextViseme() {
+                    if (index < phonemes.length) {
+                        index++;
+                        currentViseme = mapPhonemesToVisemes(phonemes[index]);
+                        setTimeout(animateNextViseme, 40);
+                    }
+                }
+                animateNextViseme();
+            }
+        };
+
+        utterance.onstart = function () {
+            currentViseme = 'AA'
+        };
+
+        utterance.onend = function () {
+            currentViseme = 'sil'
+        };
+
+        synth.speak(utterance);
+    }
+
+    function setMaleVoice(utterance, voices) {
+        // Try to find an English male voice
+        const maleVoice = voices.find(voice => {
+                // reed,eddy, google
+                return voice.lang.startsWith('en') && voice.name.toLowerCase().includes('alex');
+            }
+        );
+
+        if (maleVoice) {
+            console.debug(maleVoice)
+            utterance.voice = maleVoice;
+        } else {
+            console.warn('No male voice found, using default');
+        }
+    }
+
+    // Fetch OpenAI response from API with the configured API key
+    async function fetchFromOpenAI(prompt) {
+        const response = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${openaiApiKey}`, // Using the imported API key from openai-key.js
+            },
+            body: JSON.stringify({
+                model: 'gpt-4o-mini', // Use the gpt-3.5-turbo model (or gpt-4 if you have access)
+                messages: [
+                    {
+                        role: 'system',
+                        content: 'You are a helpful assistant.',
+                    },
+                    {
+                        role: 'user',
+                        content: prompt,
+                    }
+                ],
+                max_tokens: 150,
+            })
+        });
+
+        const data = await response.json();
+
+        // Check if the response has a valid choice
+        if (data.choices && data.choices[0] && data.choices[0].message) {
+            return data.choices[0].message.content.trim();
+        }
+
+        return 'Sorry, something went wrong.';
+    }
+
+    async function onUserInput(input) {
+        //const generatedText = input || "Hello, Avatar! How are you?";
+        const generatedText = await fetchFromOpenAI(input);
+        console.log(generatedText)
+        speak(generatedText);
+    }
+
+    window.onload = init;
+</script>
+
+<input name="text" id="inputField" style="position: absolute; left: 50px; top: 50px; ">
+</body>
+</html>
