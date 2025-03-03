@@ -21,3 +21,7 @@ Enjoy conversations with AI.
 - Model will sync lips with the voice
 
 ![avatar](docs/avatar-ai.png)
+
+## Credentials
+
+- 3d model: https://readyplayer.me
