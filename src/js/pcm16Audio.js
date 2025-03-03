@@ -57,7 +57,9 @@ class PCM16Audio {
 
         const source = this.micAudioContext.createMediaStreamSource(this.mediaStream);
 
-        await this.micAudioContext.audioWorklet.addModule("/src/js/pcmProcessor.js");
+        var pathWithoutScriptName = document.querySelector('script[src$="pcm16Audio.js"]')?.src.replace(/\/[^\/]+$/, '/') || '';
+
+        await this.micAudioContext.audioWorklet.addModule(pathWithoutScriptName + "/pcmProcessor.js");
         this.audioWorkletNode = new AudioWorkletNode(this.micAudioContext, 'pcm-processor');
         this.audioWorkletNode.port.onmessage = (event) => {
             const pcm16Data = new Int16Array(event.data);

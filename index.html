@@ -5,18 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Avatar with OpenAI and TTS</title>
     <link rel="stylesheet" href="src/style/main.css"/>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
     <script src="https://cdn.jsdelivr.net/npm/three@0.136/build/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
-    <!-- Link to the external openai-key.js -->
-    <script src="openai-key.js"></script> <!-- This file contains the API key -->
     <script src="src/js/pcm16Audio.js"></script>
 
     <!--<script src="https://cdn.jsdelivr.net/npm/meyda@5.0.0/dist/web/meyda.min.js"></script> -->
 </head>
 <body>
-<label for="inputField"></label><textarea name="text" id="inputField"></textarea>
-<button id="mic" class="mic">🎤</button>
+<label for="inputField"></label><textarea placeholder="Ask me anything here" name="text" id="inputField"></textarea>
+<button id="mic" class="mic"><i class="fa-solid fa-microphone"></i></button>
+
+<!-- Modal Structure -->
+<div id="modal" class="modal">
+    <div class="modal-content">
+        <h2>Please enter your OpenAI API Key</h2>
+        <p>This project is free and require connection to OpenAI API. You can create the key
+            <a target="_blank" href="https://platform.openai.com/settings/organization/api-keys">here</a>. You MUST
+            have positive balance on the openai account and give permissions to work with realtime-api.
+            <br/>
+            Api key will be stored in the cookies for 7 days. By submitting you will accept allowing to store and access
+            cookies by this application. If you no longer want to continue or want to change api key - please clean the
+            cookies.
+        </p>
+        <input
+                type="password"
+                id="apiKeyInput"
+                placeholder="Enter API Key"
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+                aria-label="API Key input"
+                required/>
+        <button id="submitApiKey">Submit</button>
+        <button id="cancelApiKey">Cancel</button>
+    </div>
+</div>
 
 <script>
     let scene, camera, renderer, avatar, leftEye, rightEye;
@@ -328,81 +354,147 @@
         }
     }
 
+    // Function to get a cookie by name
+    function getCookie(name) {
+        const value = `; ${document.cookie}`;
+        const parts = value.split(`; ${name}=`);
+        if (parts.length === 2) return parts.pop().split(';').shift();
+        return null;
+    }
 
-    socket = new WebSocket(
-        "wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview-2024-12-17",
-        [
-            "realtime",
-            // Auth
-            "openai-insecure-api-key." + openaiApiKey,
-            // Beta protocol, required
-            "openai-beta.realtime-v1"
-        ]);
+    // Function to set a cookie
+    function setCookie(name, value, days) {
+        const d = new Date();
+        d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
+        const expires = "expires=" + d.toUTCString();
+        document.cookie = `${name}=${value}; ${expires}; path=/`;
+    }
 
-    socket.onopen = () => {
-        console.debug("Connected to OpenAI WebSocket");
-        const event = {
-            "event_id": "event_123",
-            "type": "session.update",
-            "session": {
-                "modalities": ["text", "audio"],
-                "instructions": "You are a helpful AI assistant from 2077 Cyberpunk. You must speak only in English and not answering in any other language",
-                "voice": "ash",
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
-                "input_audio_transcription": {
-                    "model": "whisper-1"
-                },
-                "turn_detection": {
-                    "type": "server_vad",
-                    "threshold": 0.5,
-                    "prefix_padding_ms": 300,
-                    "silence_duration_ms": 500,
-                    "create_response": true
-                },
-                "tools": [
-                    {
-                        type: "function",
-                        name: "apply_some_function",
-                        description: "Some function to apply",
-                        parameters: {
-                            type: "object",
-                            properties: {
-                                "param": {"type": "string"},
-                            },
-                            required: ["param"]
-                        }
-                    }
-                ],
-                "tool_choice": "auto",
-                "temperature": 0.8,
-                "max_response_output_tokens": "inf"
+    function deleteCookie(name, domain) {
+        // Set the cookie with an expiration date in the past to delete it
+        document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    }
+
+    // deleteCookie('openaiApiKey');
+
+
+    // Get openaiApiKey from cookies
+    let openaiApiKey = getCookie('openaiApiKey');
+
+    // If the API key is not in cookies, show the modal
+    if (!openaiApiKey) {
+        const modal = document.getElementById('modal');
+        const submitButton = document.getElementById('submitApiKey');
+        const cancelButton = document.getElementById('cancelApiKey');
+        const inputField = document.getElementById('apiKeyInput');
+
+        // Show the modal
+        modal.style.display = "block";
+
+        // Handle Submit button
+        submitButton.onclick = function () {
+            openaiApiKey = inputField.value;
+            if (openaiApiKey) {
+                // Store the API key in a cookie for 7 days
+                setCookie('openaiApiKey', openaiApiKey, 7);
+                modal.style.display = "none"; // Close the modal after submission
+                initAI();
+            } else {
+                alert("API Key is required.");
             }
         }
 
-        socket.send(JSON.stringify(event));
-    }
-    socket.onmessage = (event) => {
-        let response = JSON.parse(event.data)
-        //console.log(response)
-        if (response["type"] === "response.audio_transcript.delta") {
-            // animateWord(response["delta"]) // not synced
-        } else if (response["type"] === "response.audio_transcript.done") {
-            //console.log(response)
-            //     speak(response["transcript"])
-        } else if (response["type"] === "response.audio.delta") {
-            const binaryData = atob(response["delta"]); // Decode base64 to raw binary string
-            recorder.addPlayChunk(bytesToPcm(binaryData))
-        } else {
-            //  console.log("AI Response:", event.data);
+        // Handle Cancel button
+        cancelButton.onclick = function () {
+            modal.style.display = "none"; // Close the modal on cancel
         }
 
+        // Close modal if user clicks outside of it
+        window.onclick = function (event) {
+            if (event.target === modal) {
+                modal.style.display = "none";
+            }
+        }
+    } else {
+        initAI();
     }
-    socket.onclose = () => {
-        console.debug("Disconnected from OpenAI WebSocket");
-    }
-    socket.onerror = (error) => console.error("WebSocket Error:", error);
 
+    function initAI() {
+
+        socket = new WebSocket(
+            "wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview-2024-12-17",
+            [
+                "realtime",
+                // Auth
+                "openai-insecure-api-key." + openaiApiKey,
+                // Beta protocol, required
+                "openai-beta.realtime-v1"
+            ]);
+
+        socket.onopen = () => {
+            console.debug("Connected to OpenAI WebSocket");
+            const event = {
+                "event_id": "event_123",
+                "type": "session.update",
+                "session": {
+                    "modalities": ["text", "audio"],
+                    "instructions": "You are a helpful AI assistant from 2077 Cyberpunk. You must speak only in English and not answering in any other language",
+                    "voice": "ash",
+                    "input_audio_format": "pcm16",
+                    "output_audio_format": "pcm16",
+                    "input_audio_transcription": {
+                        "model": "whisper-1"
+                    },
+                    "turn_detection": {
+                        "type": "server_vad",
+                        "threshold": 0.5,
+                        "prefix_padding_ms": 300,
+                        "silence_duration_ms": 500,
+                        "create_response": true
+                    },
+                    "tools": [
+                        {
+                            type: "function",
+                            name: "apply_some_function",
+                            description: "Some function to apply",
+                            parameters: {
+                                type: "object",
+                                properties: {
+                                    "param": {"type": "string"},
+                                },
+                                required: ["param"]
+                            }
+                        }
+                    ],
+                    "tool_choice": "auto",
+                    "temperature": 0.8,
+                    "max_response_output_tokens": "inf"
+                }
+            }
+
+            socket.send(JSON.stringify(event));
+        }
+        socket.onmessage = (event) => {
+            let response = JSON.parse(event.data)
+            //console.log(response)
+            if (response["type"] === "response.audio_transcript.delta") {
+                // animateWord(response["delta"]) // not synced
+            } else if (response["type"] === "response.audio_transcript.done") {
+                //console.log(response)
+                //     speak(response["transcript"])
+            } else if (response["type"] === "response.audio.delta") {
+                const binaryData = atob(response["delta"]); // Decode base64 to raw binary string
+                recorder.addPlayChunk(bytesToPcm(binaryData))
+            } else {
+                //  console.log("AI Response:", event.data);
+            }
+
+        }
+        socket.onclose = () => {
+            console.debug("Disconnected from OpenAI WebSocket");
+        }
+        socket.onerror = (error) => console.error("WebSocket Error:", error);
+    }
 
     async function onUserInput(input) {
         const event = {
