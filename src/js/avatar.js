@@ -67,6 +67,8 @@ class Avatar {
                     console.info('Left and Right eyes found!');
                 }
 
+                // https://docs.readyplayer.me/ready-player-me/integration-guides/unity/animations/ready-player-me-animation-library
+                // https://github.com/readyplayerme/animation-library/tree/master?tab=readme-ov-file#tutorials
                 clz.loadAnimations(clz.avatar, "./src/assets/F_Standing_Idle_001.fbx");
 
             },
