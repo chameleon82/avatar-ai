@@ -12,6 +12,7 @@
     <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/FBXLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lil-gui@0.20.0/dist/lil-gui.umd.min.js"></script>
 
     <script src="src/js/pcm16Audio.js"></script>
     <script src="src/js/avatar.js"></script>
@@ -50,6 +51,7 @@
 
 <script>
     let avatar = new Avatar("./src/assets/avatar.glb");
+  //  let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
     let socket;
 
     async function init() {
