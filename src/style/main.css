@@ -1,42 +1,39 @@
+/* Global Styles */
 body {
     margin: 0;
     overflow: hidden;
+    background: url("../../src/images/night-city-dalle.jpg") no-repeat center/cover;
+    height: 100vh;
 }
 
 canvas {
     display: block;
 }
 
-body {
-    background-image: url("../../src/images/night-city-dalle.jpg");
-    background-repeat: no-repeat;
-    background-size: cover;
-    background-position: center;
-    height: 100vh; /* Ensure the background fills the entire viewport */
-    margin: 0; /* Remove any default margins */
-}
-
-
-textarea {
-    width: 100%;
-    height: 150px;
-    background: #0d0d0d; /* Dark background */
-    color: #00ffea; /* Neon cyan text */
-    font-family: 'Orbitron', sans-serif; /* Futuristic font */
-    font-size: 16px;
-    padding: 10px;
-    border: 2px solid #00ffea; /* Neon border */
-    outline: none;
-    resize: none;
-    border-radius: 5px;
+/* Common Styles */
+.neon-border {
+    border: 2px solid #00ffea;
     box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
     transition: 0.3s;
 }
 
-/* Glow effect on focus */
-textarea:focus {
-    border-color: #ff00ff; /* Pink neon when active */
+.neon-border:focus, .neon-border:hover {
+    border-color: #ff00ff;
     box-shadow: 0 0 10px #ff00ff, 0 0 25px rgba(255, 0, 255, 0.5);
+}
+
+/* Textarea & Input Fields */
+textarea, .modal input[type="password"] {
+    width: 100%;
+    background: #0d0d0d;
+    color: #00ffea;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 16px;
+    padding: 10px;
+    outline: none;
+    resize: none;
+    border-radius: 5px;
+    box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
 }
 
 /* Scrollbar styling */
@@ -51,34 +48,8 @@ textarea::-webkit-scrollbar-track {
     background: #222;
 }
 
-/* Add a subtle animation */
-@keyframes neonPulse {
-    0% { box-shadow: 0 0 8px #00ffea; }
-    50% { box-shadow: 0 0 15px #00ffea; }
-    100% { box-shadow: 0 0 8px #00ffea; }
-}
-textarea:hover {
-    animation: neonPulse 1.5s infinite alternate;
-}
-
-
-#inputField {
-    position: absolute;
-    right: 150px;
-    bottom: 50px;
-    width: 400px;
-    height: 50px;
-    resize: none;
-}
-
-.mic {
-    position: absolute;
-    right: 50px;
-    bottom: 50px;
-}
-
-/* Base button styles */
-button.mic, button.recording {
+/* Button Styles */
+button.mic, button.recording, .modal button {
     font-family: 'Orbitron', sans-serif;
     font-size: 16px;
     padding: 12px 24px;
@@ -88,142 +59,124 @@ button.mic, button.recording {
     outline: none;
     cursor: pointer;
     text-transform: uppercase;
-    overflow: hidden;
     transition: 0.3s ease-in-out;
 }
 
-/* Idle microphone button */
 button.mic {
-    background: #0d0d0d; /* Dark background */
-    color: #00ffea; /* Neon cyan text */
-    border: 2px solid #00ffea; /* Neon cyan border */
-    box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
+    background: #0d0d0d;
+    color: #00ffea;
+    @extend .neon-border;
 }
 
-button.mic:hover {
-    border-color: #ff00ff; /* Pink neon on hover */
-    box-shadow: 0 0 10px #ff00ff, 0 0 25px rgba(255, 0, 255, 0.5);
-}
-
-/* Active recording button */
 button.recording {
-    background: #ff0000; /* Red background */
+    background: #ff0000;
     color: #fff;
-    border: 2px solid #ff3300; /* Glowing red */
+    border: 2px solid #ff3300;
     box-shadow: 0 0 12px #ff3300, 0 0 30px rgba(255, 51, 0, 0.8);
     animation: pulseGlow 1s infinite alternate;
 }
 
-/* Glow animation for recording state */
 @keyframes pulseGlow {
     0% { box-shadow: 0 0 10px #ff3300, 0 0 20px rgba(255, 51, 0, 0.6); }
     100% { box-shadow: 0 0 18px #ff6600, 0 0 35px rgba(255, 102, 0, 0.8); }
 }
 
-
-
-
-
-/* Basic modal styling */
+/* Modal */
 .modal {
-    display: none; /* Hidden by default */
-    position: fixed; /* Stay in place */
-    z-index: 1; /* Sit on top */
+    display: none;
+    position: fixed;
+    z-index: 1;
     left: 0;
     top: 0;
-    width: 100%; /* Full width */
-    height: 100%; /* Full height */
-    overflow: auto; /* Enable scroll if needed */
-    background-color: rgb(0, 0, 0); /* Fallback color */
-    background-color: rgba(0, 0, 0, 0.8); /* Darker background with opacity */
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
     padding-top: 60px;
 }
 
-/* Modal content styling */
 .modal-content {
-    background-color: #0d0d0d; /* Dark background */
+    background: #0d0d0d;
     margin: 5% auto;
     padding: 30px;
-    border: 2px solid #00ffea; /* Neon cyan border */
-    width: 80%; /* Could be adjusted */
+    @extend .neon-border;
+    width: 80%;
     max-width: 600px;
-    color: #00ffea; /* Neon cyan text */
-    font-family: 'Orbitron', sans-serif; /* Futuristic font */
-    box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
+    color: #00ffea;
+    font-family: 'Orbitron', sans-serif;
 }
 
-/* Input field inside modal */
-.modal input[type="password"] {
-    width: 95%;
-    padding: 12px;
-    margin-bottom: 20px;
-    font-size: 16px;
-    background-color: #222; /* Dark background */
-    color: #00ffea; /* Neon cyan text */
+.modal button#cancelApiKey {
+    background: #333;
+    color: #ff0033;
+    border: 2px solid #ff0033;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    #inputField {
+        right: 10px;
+        bottom: 10px;
+        width: 90%;
+    }
+
+    .mic {
+        right: 10px;
+        bottom: 70px;
+    }
+
+    textarea {
+        height: 120px;
+    }
+}
+
+.input-container {
+    position: absolute;
+    bottom: 20px; /* Adjust as needed */
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 90%;
+    max-width: 600px;
+}
+
+textarea {
+    flex: 1; /* Takes available space */
+    height: 100px;
+    background: #0d0d0d;
+    color: #00ffea;
     font-family: 'Orbitron', sans-serif;
-    border: 2px solid #00ffea; /* Neon cyan border */
+    font-size: 16px;
+    padding: 10px;
+    border: 2px solid #00ffea;
     outline: none;
+    resize: none;
     border-radius: 5px;
     box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
-    transition: 0.3s ease-in-out;
+    transition: 0.3s;
 }
 
-/* Glow effect on input focus */
-.modal input[type="password"]:focus {
-    border-color: #ff00ff; /* Pink neon on focus */
-    box-shadow: 0 0 10px #ff00ff, 0 0 25px rgba(255, 0, 255, 0.5);
-}
-
-/* Submit button inside modal */
-.modal button {
-    padding: 12px 24px;
-    margin: 5px;
-    font-size: 16px;
+button.mic {
+    width: 50px;
+    height: 50px;
+    background: #0d0d0d;
+    color: #00ffea;
+    border: 2px solid #00ffea;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     cursor: pointer;
-    background: #0d0d0d; /* Dark background */
-    color: #00ffea; /* Neon cyan text */
-    border: 2px solid #00ffea; /* Neon cyan border */
     box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
-    font-family: 'Orbitron', sans-serif; /* Futuristic font */
-    transition: 0.3s ease-in-out;
+    transition: 0.3s;
 }
 
-/* Hover effect on buttons */
-.modal button:hover {
-    border-color: #ff00ff; /* Pink neon on hover */
+button.mic:hover {
+    border-color: #ff00ff;
     box-shadow: 0 0 10px #ff00ff, 0 0 25px rgba(255, 0, 255, 0.5);
 }
 
-/* Cancel button styling */
-.modal button#cancelApiKey {
-    background: #333; /* Darker background for cancel button */
-    color: #ff0033; /* Red neon text */
-    border: 2px solid #ff0033; /* Red neon border */
-}
-
-.modal button#cancelApiKey:hover {
-    border-color: #ff0033;
-    box-shadow: 0 0 10px #ff0033, 0 0 25px rgba(255, 0, 51, 0.5);
-}
-
-/* Style for all anchor tags */
-a {
-    color: #66ff66; /* Soft neon green for default link color */
-    text-decoration: none; /* Remove underline */
-    font-family: 'Orbitron', sans-serif; /* Futuristic font */
-    font-size: 18px; /* Adjust font size for readability */
-    transition: 0.3s ease-in-out; /* Smooth transition on hover */
-}
-
-/* Hover effect for anchor tags */
-a:hover {
-    color: #ff00ff; /* Neon pink color on hover */
-    text-decoration: underline; /* Underline on hover */
-    box-shadow: 0 0 10px #ff00ff, 0 0 20px rgba(255, 0, 255, 0.5); /* Glowing effect */
-}
-
-/* Focus effect for anchor tags (for accessibility) */
-a:focus {
-    outline: none; /* Remove default outline */
-    box-shadow: 0 0 10px #ff00ff, 0 0 20px rgba(255, 0, 255, 0.5); /* Glowing effect on focus */
+.visually-hidden {
+    display: none;
 }

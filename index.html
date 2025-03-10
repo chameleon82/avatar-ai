@@ -20,8 +20,14 @@
     <!--<script src="https://cdn.jsdelivr.net/npm/meyda@5.0.0/dist/web/meyda.min.js"></script> -->
 </head>
 <body>
-<label for="inputField"></label><textarea placeholder="Ask me anything here" name="text" id="inputField"></textarea>
-<button id="mic" class="mic"><i class="fa-solid fa-microphone"></i></button>
+<div class="input-container">
+    <label for="inputField" class="visually-hidden">Ask me anything</label>
+    <textarea placeholder="Ask me anything here" name="text" id="inputField" rows="4"></textarea>
+    <button id="mic" class="mic" aria-label="Start voice input" aria-controls="inputField">
+        <i class="fa-solid fa-microphone"></i>
+    </button>
+</div>
+
 
 <!-- Modal Structure -->
 <div id="modal" class="modal">
