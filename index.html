@@ -50,7 +50,7 @@
 </div>
 
 <script>
-    let avatar = new Avatar("./src/assets/avatar.glb");
+    let avatar = new Avatar("./src/assets/avatar-w.glb");
   //  let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
     let socket;
 
@@ -233,8 +233,8 @@
                 "type": "session.update",
                 "session": {
                     "modalities": ["text", "audio"],
-                    "instructions": "You are a helpful AI assistant",
-                    "voice": "ash",
+                    "instructions": "You are a helpful AI assistant. Your name is Milena. User see you as avatar and your speech is lips synced with avatar",
+                    "voice": "sage",
                     "input_audio_format": "pcm16",
                     "output_audio_format": "pcm16",
                     "turn_detection": {

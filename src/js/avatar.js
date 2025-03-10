@@ -14,17 +14,27 @@ class Avatar {
         this.clock  = new THREE.Clock();
         this.scene = new THREE.Scene();
 
-        this.camera = new THREE.PerspectiveCamera(7, window.innerWidth / window.innerHeight, 0.01, 100);
+        this.camera = new THREE.PerspectiveCamera(6, window.innerWidth / window.innerHeight, 0.01, 100);
         this.camera.position.set(0, 2.0, 5);
-        this.camera.lookAt(new THREE.Vector3(0, 1.7, 0));
-
+        this.camera.lookAt(new THREE.Vector3(0, 1.6, 0));
 
         this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
         // Enable shadows in the renderer
         this.renderer.shadowMap.enabled = true;
         this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
 
-        const ambientLight = new THREE.AmbientLight(0xffffff, 1.7);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.2;
+        this.renderer.antialias = true; // Enable anti-aliasing
+
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows
+
+
+        // https://github.com/readyplayerme/visage/blob/0eafdd9c4c10db079de2656c3eb59212a2fb7f63/src/components/Exhibit/Exhibit.component.tsx#L92
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1.5);
         this.scene.add(ambientLight);
 
         // //SpotLight for more focused highlights
@@ -36,6 +46,10 @@ class Avatar {
         spotlight.distance = 10; // Limit range
         spotlight.castShadow = true; // Enable shadows
         spotlight.shadow.bias = -0.003; // Reduce shadow artifacts
+
+        spotlight.shadow.mapSize.width = 2048;
+        spotlight.shadow.mapSize.height = 2048;
+        spotlight.shadow.radius = 5; // Softer edges
         this.scene.add(spotlight);
 
         const coolFillLight = new THREE.HemisphereLight(0x88ccff, 0x080820, 0.5); // Sky blue & dark blue
@@ -71,6 +85,24 @@ class Avatar {
                 });
                 model.position.set(0, 0, 0);
                 model.scale.set(1, 1, 1);
+
+                model.traverse((child) => {
+                    if (child.isMesh && child.material.map) {
+                        child.material.map.minFilter = THREE.LinearMipMapLinearFilter;
+                        child.material.map.magFilter = THREE.LinearFilter;
+                        child.material.needsUpdate = true;
+                    }
+                });
+
+                model.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        child.material.flatShading = false; // Ensure smooth shading
+                        child.material.needsUpdate = true;
+                    }
+                });
+
                 clz.scene.add(model);
 
 
