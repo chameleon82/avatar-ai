@@ -41,6 +41,11 @@ class PCM16Audio {
         // use chunk audio instead of analyzed for smoother voice. ideally those should sync good enough
         // this.analyser.connect(this.playAudioContext.destination);
         //const bufferLength = analyser.frequencyBinCount;
+
+        // Track the last timestamp of the received audio chunk
+        this.lastAudioTimestamp = 0;
+        this.silenceThreshold = 0.02;  // Amplitude threshold to detect silence
+        this.maxSilenceDuration = 1000; // Maximum silence duration in ms
     }
 
     // start recording microphone
@@ -67,8 +72,17 @@ class PCM16Audio {
             // Resample the buffer to target sample rate (24000 Hz)
             const resampledData = this.resampleBuffer(pcm16Data, this.inputSampleRate, this.targetSampleRate);
 
-            // execute callback
-            this.onChunk(resampledData)
+            // Check if the chunk is silent
+            if (this.isSilent(resampledData)) {
+                const currentTime = Date.now();
+                if (currentTime - this.lastAudioTimestamp > this.maxSilenceDuration) {
+                    // Skip chunk if silence is too long
+                    return;
+                }
+            } else {
+                this.lastAudioTimestamp = Date.now();
+            }
+            this.onChunk(resampledData);
 
             // link microphone output to headphones input
             //  this.audioQueue.push(resampledData);
@@ -79,6 +93,19 @@ class PCM16Audio {
 
         source.connect(this.audioWorkletNode);
 
+    }
+
+    // Check if the audio chunk is silent
+    isSilent(pcm16Data) {
+        let maxAmplitude = 0;
+        for (let i = 0; i < pcm16Data.length; i++) {
+            const amplitude = Math.abs(pcm16Data[i]);
+            if (amplitude > maxAmplitude) {
+                maxAmplitude = amplitude;
+            }
+        }
+        //  console.log(maxAmplitude < this.silenceThreshold * 32768)
+        return maxAmplitude < this.silenceThreshold * 32768;  // 32768 is the max possible amplitude for PCM16
     }
 
     // Stop recording microphone
