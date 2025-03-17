@@ -88,72 +88,6 @@
     }
 
 
-    function animateWord(word) {
-        const phonemes = convertWordToPhonemes(word).split(" ");
-        let index = 0;
-
-        function animateNextViseme() {
-            if (index < phonemes.length) {
-                index++;
-                avatar.setViseme(mapPhonemesToVisemes(phonemes[index]));
-                setTimeout(animateNextViseme, 40);
-            }
-        }
-
-        animateNextViseme();
-    }
-
-    function speak(text) {
-        clz = this
-        const synth = window.speechSynthesis;
-        const utterance = new SpeechSynthesisUtterance(text);
-
-        let voices = synth.getVoices();
-        if (voices.length === 0) {
-            synth.onvoiceschanged = () => {
-                voices = synth.getVoices();
-                setMaleVoice(utterance, voices);
-            };
-        } else {
-            setMaleVoice(utterance, voices);
-        }
-
-        utterance.onboundary = function (event) {
-            // For example, trigger mouth animation when phoneme is reached
-            if (event.name === 'word') {
-                //   const txt = event.target.text.substring(event.charIndex, event.charIndex + event.charLength)
-                //   animateWord(txt)
-            }
-        };
-
-        utterance.onstart = function () {
-            // Take a breathe before speakin`
-            clz.avatar.setViseme('AA')
-        };
-
-        utterance.onend = function () {
-            clz.avatar.setViseme('sil')
-        };
-
-        synth.speak(utterance);
-    }
-
-    function setMaleVoice(utterance, voices) {
-        // Try to find an English male voice
-        const maleVoice = voices.find(voice => {
-                // reed,eddy, google
-                return voice.lang.startsWith('en') && voice.name.toLowerCase().includes('alex');
-            }
-        );
-
-        if (maleVoice) {
-            console.debug(maleVoice)
-            utterance.voice = maleVoice;
-        } else {
-            console.warn('No male voice found, using default');
-        }
-    }
-
     // Function to get a cookie by name
     function getCookie(name) {
         const value = `; ${document.cookie}`;
@@ -219,6 +153,8 @@
         initAI();
     }
 
+    var eventId = 1
+
     function initAI() {
 
         socket = new WebSocket(
@@ -235,11 +171,12 @@
             avatar.setSleep(false)
             console.debug("Connected to OpenAI WebSocket");
             const event = {
-                "event_id": "event_123",
+                "event_id": "event_" + eventId++,
                 "type": "session.update",
                 "session": {
                     "modalities": ["text", "audio"],
-                    "instructions": "You are a helpful AI assistant. Your name is Milena, you are woman-like. User see you as avatar and your speech is lips synced with avatar",
+                   // "instructions": "You are a helpful AI assistant. Your name is Milena, you are woman-like. User see you as avatar and your speech is lips synced with avatar",
+                    "instructions": "You are my vibrant and energetic friend, Milena! A 23-year-old woman with a bubbly personality, always ready with a joke or a fun fact to make me smile. You're full of life, witty, and always brightening up the conversation. I can see you as a woman avatar with lips perfectly synced to your speech. You're always positive, upbeat, and ready for a good time! Let's keep the energy high and the vibe exciting!",
                     "voice": "sage",
                     "input_audio_format": "pcm16",
                     "output_audio_format": "pcm16",
@@ -341,7 +278,7 @@
 //        recorder.addPlayChunk(bytesToPcm(byteString)) // send mic instead for testing
             socket.send(JSON.stringify(
                 {
-                    "event_id": "event_456",
+                    "event_id": "event_" + eventId++,
                     "type": "input_audio_buffer.append",
                     "audio": btoa(byteString)
                 }

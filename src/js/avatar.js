@@ -115,12 +115,12 @@ class Avatar {
                     const validTracks = tracks.filter(track => {
                         return  !track.name.includes("Hips.position")
                     });
-
                     const filteredClip = new THREE.AnimationClip('FilteredAnimation', -1, validTracks);
                     const action = clz.mixer.clipAction(filteredClip)
                     action.play(); // Start the animation
-
                 });
+
+
                 // https://docs.readyplayer.me/ready-player-me/integration-guides/unity/animations/ready-player-me-animation-library
                 // https://github.com/readyplayerme/animation-library/tree/master?tab=readme-ov-file#tutorials
             },

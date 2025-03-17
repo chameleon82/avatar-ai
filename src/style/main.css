@@ -53,8 +53,6 @@ button.mic, button.recording, .modal button {
     font-family: 'Orbitron', sans-serif;
     font-size: 16px;
     padding: 12px 24px;
-    width: 74px;
-    height: 74px;
     border-radius: 5px;
     outline: none;
     cursor: pointer;
@@ -103,6 +101,11 @@ button.recording {
     max-width: 600px;
     color: #00ffea;
     font-family: 'Orbitron', sans-serif;
+}
+
+.modal button {
+    margin-top: 5px;
+    margin-bottom: 5px;
 }
 
 .modal button#cancelApiKey {
@@ -155,6 +158,39 @@ textarea {
     border-radius: 5px;
     box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
     transition: 0.3s;
+}
+
+button {
+    background: #222;
+    border: 2px solid #ff0;
+    border-radius: 6px;
+    color: #ff0;
+    padding: 12px 20px;
+    font-size: 14px;
+    text-transform: uppercase;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease-in-out;
+}
+
+button:hover {
+    background: #ff0;
+    color: #000;
+    border-color: #ff0;
+}
+
+#overlay button {
+    background: #333;
+    border: 2px solid #fff;
+    color: #fff;
+    padding: 14px 24px;
+    font-size: 16px;
+    border-radius: 8px;
+}
+
+#overlay button:hover {
+    background: #fff;
+    color: #000;
 }
 
 button.mic {

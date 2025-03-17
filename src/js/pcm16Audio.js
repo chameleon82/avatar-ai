@@ -38,7 +38,8 @@ class PCM16Audio {
         this.analyser = this.playAudioContext.createAnalyser();
         this.analyser.fftSize = 1024; // Optimal size to viseme detection
         this.analyser.smoothingTimeConstant = 0.2; // 0.2 is optimal for visemes to balance smoothness and transition
-        this.analyser.connect(this.playAudioContext.destination);
+        // use chunk audio instead of analyzed for smoother voice. ideally those should sync good enough
+        // this.analyser.connect(this.playAudioContext.destination);
         //const bufferLength = analyser.frequencyBinCount;
     }
 
@@ -140,6 +141,8 @@ class PCM16Audio {
 
         // Create a buffer source to process the audio
         const bufferSource = this.playAudioContext.createBufferSource();
+        // connect buffer to Sound Output for smoother sound instead of analyzer
+        bufferSource.connect(this.playAudioContext.destination);
         bufferSource.buffer = audioBuffer;
         bufferSource.start();
 
