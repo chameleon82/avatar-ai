@@ -1,33 +1,39 @@
 class Phonemes {
 
-    // include only English Phonemes
+    // Minimal English phoneme rules.
+    // Important: patterns must match from the START of the remaining string.
     phonemeRules = [
+        // digraphs (longer first)
         {pattern: /^sh/, phoneme: "ʃ"}, // "sh" -> /ʃ/
         {pattern: /^ch/, phoneme: "ʧ"}, // "ch" -> /ʧ/
         {pattern: /^th/, phoneme: "θ"}, // "th" -> /θ/
         {pattern: /^ea/, phoneme: "iː"}, // "ea" -> /iː/
-        {pattern: /^oo/, phoneme: "uː"}, // "oo" -> /uː/
-        {pattern: /^oo/, phoneme: "ʊ"}, // "oo" -> /ʊ/ for "book"
-        {pattern: /a/, phoneme: "æ"},   // "a" -> /æ/
-        {pattern: /e/, phoneme: "ɛ"},   // "e" -> /ɛ/
-        {pattern: /i/, phoneme: "ɪ"},   // "i" -> /ɪ/
-        {pattern: /o/, phoneme: "ɒ"},   // "o" -> /ɒ/
-        {pattern: /u/, phoneme: "ʌ"},   // "u" -> /ʌ/
-        {pattern: /p/, phoneme: "p"},   // "p" -> /p/
-        {pattern: /b/, phoneme: "b"},   // "b" -> /b/
-        {pattern: /t/, phoneme: "t"},   // "t" -> /t/
-        {pattern: /d/, phoneme: "d"},   // "d" -> /d/
-        {pattern: /k/, phoneme: "k"},   // "k" -> /k/
-        {pattern: /g/, phoneme: "g"},   // "g" -> /g/
-        {pattern: /l/, phoneme: "l"},   // "l" -> /l/
-        {pattern: /r/, phoneme: "r"},   // "r" -> /r/
-        {pattern: /m/, phoneme: "m"},   // "m" -> /m/
-        {pattern: /n/, phoneme: "n"},   // "n" -> /n/
-        {pattern: /s/, phoneme: "s"},   // "s" -> /s/
-        {pattern: /z/, phoneme: "z"},   // "z" -> /z/
-        {pattern: /f/, phoneme: "f"},   // "f" -> /f/
-        {pattern: /v/, phoneme: "v"},   // "v" -> /v/
+
+        // Note: "oo" can be /uː/ or /ʊ/ depending on the word. We keep one mapping for determinism.
+        {pattern: /^oo/, phoneme: "uː"},
+
+        // single letters
+        {pattern: /^a/, phoneme: "æ"},
+        {pattern: /^e/, phoneme: "ɛ"},
+        {pattern: /^i/, phoneme: "ɪ"},
+        {pattern: /^o/, phoneme: "ɒ"},
+        {pattern: /^u/, phoneme: "ʌ"},
+        {pattern: /^p/, phoneme: "p"},
+        {pattern: /^b/, phoneme: "b"},
+        {pattern: /^t/, phoneme: "t"},
+        {pattern: /^d/, phoneme: "d"},
+        {pattern: /^k/, phoneme: "k"},
+        {pattern: /^g/, phoneme: "g"},
+        {pattern: /^l/, phoneme: "l"},
+        {pattern: /^r/, phoneme: "r"},
+        {pattern: /^m/, phoneme: "m"},
+        {pattern: /^n/, phoneme: "n"},
+        {pattern: /^s/, phoneme: "s"},
+        {pattern: /^z/, phoneme: "z"},
+        {pattern: /^f/, phoneme: "f"},
+        {pattern: /^v/, phoneme: "v"},
     ];
+
 
     visemeMapping = {
         "ʃ": "CH",
@@ -57,31 +63,44 @@ class Phonemes {
         "v": "FF"
     };
 
-    // Simple converter to convert words to phonemes
-    // result is a list of phonemes
+    // Convert a single word to a space-separated phoneme string.
+    // Example: "this" -> "θ ɪ s" (very simplified)
     convertWordToPhonemes(word) {
-        let phonemes = [];
-        word = word.toLowerCase();
+        const list = this.convertWordToPhonemeList(word);
+        return list.join(" ");
+    }
 
-        let remainingWord = word;
-        while (remainingWord.length > 0) {
+    // Same as convertWordToPhonemes, but returns an array for easier downstream processing.
+    convertWordToPhonemeList(word) {
+        if (typeof word !== "string") return [];
+
+        const phonemes = [];
+        let remaining = word.toLowerCase();
+
+        while (remaining.length > 0) {
             let matched = false;
-            for (let rule of this.phonemeRules) {
-                if (remainingWord.startsWith(rule.pattern.source)) {
+
+            for (const rule of this.phonemeRules) {
+                const match = remaining.match(rule.pattern);
+                if (match && match.index === 0) {
+                    const consumed = match[0];
                     phonemes.push(rule.phoneme);
-                    remainingWord = remainingWord.slice(rule.pattern.source.length);
+                    remaining = remaining.slice(consumed.length);
                     matched = true;
                     break;
                 }
             }
+
             if (!matched) {
-                phonemes.push(remainingWord[0]);  // Add the letter as is if no rule matches
-                remainingWord = remainingWord.slice(1);
+                // If no rule matched, consume one character to avoid infinite loops.
+                phonemes.push(remaining[0]);
+                remaining = remaining.slice(1);
             }
         }
 
-        return phonemes.join(" ");
+        return phonemes;
     }
+
 
     // Convert phonemes into visemes
     // return list of visemes

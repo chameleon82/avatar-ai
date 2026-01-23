@@ -36,8 +36,10 @@ class PCM16Audio {
 
         // Create an analyser node for frequency analysis
         this.analyser = this.playAudioContext.createAnalyser();
-        this.analyser.fftSize = 1024; // Optimal size to viseme detection
-        this.analyser.smoothingTimeConstant = 0.2; // 0.2 is optimal for visemes to balance smoothness and transition
+        this.analyser.fftSize = 1024; // Balance between frequency resolution and responsiveness
+        this.analyser.smoothingTimeConstant = 0.25; // More smoothing => less jitter in dominant frequency
+
+
         // use chunk audio instead of analyzed for smoother voice. ideally those should sync good enough
         // this.analyser.connect(this.playAudioContext.destination);
         //const bufferLength = analyser.frequencyBinCount;
@@ -46,6 +48,21 @@ class PCM16Audio {
         this.lastAudioTimestamp = 0;
         this.silenceThreshold = 0.02;  // Amplitude threshold to detect silence
         this.maxSilenceDuration = 1000; // Maximum silence duration in ms
+
+        // Viseme detection smoothing / hysteresis
+        this._currentViseme = null;
+        this._candidateViseme = null;
+        this._candidateFrames = 0;
+        this._lastVisemeEmitTs = 0;
+
+        // Tuning knobs
+        this._analysisIntervalMs = 33; // ~30 fps: smoother and less jittery
+        this._minHoldMs = 70; // hold viseme longer to avoid rapid toggling
+        this._confirmFrames = 2; // require 2 consecutive frames to switch
+        this._silenceRms = 0.008; // reduce micro-noise triggering
+
+
+
     }
 
     // start recording microphone
@@ -110,10 +127,19 @@ class PCM16Audio {
 
     // Stop recording microphone
     stop() {
-        if (this.audioWorkletNode) this.audioWorkletNode.disconnect();
+        // Ask the worklet to flush any remaining buffered samples first.
+        if (this.audioWorkletNode) {
+            try {
+                this.audioWorkletNode.port.postMessage('STOP');
+            } catch (e) {
+                // ignore
+            }
+            this.audioWorkletNode.disconnect();
+        }
         if (this.mediaStream) this.mediaStream.getTracks().forEach(track => track.stop());
         if (this.micAudioContext) this.micAudioContext.close();
     }
+
 
     addPlayChunk(pcm16Data) {
         this.audioQueue.push(pcm16Data);
@@ -161,91 +187,157 @@ class PCM16Audio {
 
 
     detectVisemeFromPCM16(audioBuffer, cb) {
-
-        const clz = this
         const dataArray = new Uint8Array(this.analyser.frequencyBinCount);
-        const chunkSize = this.analyser.fftSize; // Size of each chunk/frame. For visemes detection fftSize is optimal
+        const timeArray = new Uint8Array(this.analyser.fftSize);
 
         // Create a buffer source to process the audio
         const bufferSource = this.playAudioContext.createBufferSource();
-        // connect buffer to Sound Output for smoother sound instead of analyzer
-        bufferSource.connect(this.playAudioContext.destination);
         bufferSource.buffer = audioBuffer;
-        bufferSource.start();
 
-        const float32Data = audioBuffer.getChannelData(0)
+        // Analyse the same audio that is being played.
+        bufferSource.connect(this.analyser);
+        bufferSource.connect(this.playAudioContext.destination);
 
-        // Function to process each chunk/frame of PCM16 data
-        // Todo: is it synced with bufferSource ends?
-        function processChunk(startIdx, chunkSize) {
-            const chunk = float32Data.slice(startIdx, startIdx + chunkSize);
-            if (chunk.length === 0) return
-            const audioBufferChunk = clz.playAudioContext.createBuffer(1, chunk.length, clz.playAudioContext.sampleRate);
-            audioBufferChunk.getChannelData(0).set(chunk);
+        // Make analyser more speech-friendly
+        this.analyser.minDecibels = -90;
+        this.analyser.maxDecibels = -10;
 
-            // Create a temporary buffer source to feed to analyser
-            const tempSource = clz.playAudioContext.createBufferSource();
-            tempSource.buffer = audioBufferChunk;
-            tempSource.connect(clz.analyser);
+        // Reset smoothing state for this playback segment
+        this._candidateViseme = null;
+        this._candidateFrames = 0;
 
-            tempSource.start();
+        const clz = this;
+        let timerId = null;
 
-            // Process the frequency data of this chunk
-            clz.analyser.getByteFrequencyData(dataArray);
-            // Find dominant frequencies in the chunk
-            let dominantFreq = clz.findDominantFrequency(dataArray);
-            // Map dominant frequency to a phoneme
-            let detectedPhoneme = clz.detectVisemeFromFrequency(dominantFreq);
-            // Invoke the callback with the detected phoneme
-            clz.onVisemeDetected(detectedPhoneme)
-            // Stop the temporary source after processing the chunk
-            tempSource.onended = () => {
-                tempSource.disconnect();
-                tempSource.stop();
-                processChunk(startIdx + chunkSize, chunkSize)
-            };
+        function rmsFromTimeDomain(bytes) {
+            // bytes are 0..255 with 128 as 0
+            let sum = 0;
+            for (let i = 0; i < bytes.length; i++) {
+                const v = (bytes[i] - 128) / 128;
+                sum += v * v;
+            }
+            return Math.sqrt(sum / bytes.length);
         }
 
-        processChunk(0, chunkSize)
+        function emitVisemeMaybe(viseme) {
+            const now = performance.now();
 
-        // Cleanup after processing
+            // Treat null/NaN as silence
+            if (!viseme || Number.isNaN(viseme)) {
+                clz._candidateViseme = null;
+                clz._candidateFrames = 0;
+
+                if (clz._currentViseme !== null && now - clz._lastVisemeEmitTs >= clz._minHoldMs) {
+                    clz._currentViseme = null;
+                    clz._lastVisemeEmitTs = now;
+                    clz.onVisemeDetected(null);
+                }
+                return;
+            }
+
+            // If same as current, just keep it
+            if (viseme === clz._currentViseme) {
+                clz._candidateViseme = null;
+                clz._candidateFrames = 0;
+                return;
+            }
+
+            // Enforce minimum hold to prevent jitter
+            if (now - clz._lastVisemeEmitTs < clz._minHoldMs) {
+                return;
+            }
+
+            // Confirm new candidate across multiple frames
+            if (viseme === clz._candidateViseme) {
+                clz._candidateFrames++;
+            } else {
+                clz._candidateViseme = viseme;
+                clz._candidateFrames = 1;
+            }
+
+            if (clz._candidateFrames >= clz._confirmFrames) {
+                clz._currentViseme = viseme;
+                clz._lastVisemeEmitTs = now;
+                clz.onVisemeDetected(viseme);
+                clz._candidateViseme = null;
+                clz._candidateFrames = 0;
+            }
+        }
+
+        function analyzeFrame() {
+            clz.analyser.getByteTimeDomainData(timeArray);
+            const rms = rmsFromTimeDomain(timeArray);
+
+            if (rms < clz._silenceRms) {
+                emitVisemeMaybe(null);
+                return;
+            }
+
+            clz.analyser.getByteFrequencyData(dataArray);
+
+            // Focus on the speech band; ignore very low/high bins
+            const dominantFreq = clz.findDominantFrequency(dataArray);
+
+            // If we clearly have signal (RMS above silence), but the spectrum is too weak/noisy,
+            // keep the current viseme instead of snapping to silence.
+            if (Number.isNaN(dominantFreq)) {
+                return;
+            }
+
+            const detectedViseme = clz.detectVisemeFromFrequency(dominantFreq);
+            emitVisemeMaybe(detectedViseme);
+
+        }
+
+        // Start playback
+        bufferSource.start();
+
+        // Sample analyser regularly while this chunk is playing
+        timerId = setInterval(analyzeFrame, this._analysisIntervalMs);
+
         bufferSource.onended = () => {
+            if (timerId) clearInterval(timerId);
             bufferSource.disconnect();
-            cb()
+            // Reset candidate and emit silence at the end
+            clz._candidateViseme = null;
+            clz._candidateFrames = 0;
+            clz._currentViseme = null;
+            clz.onVisemeDetected(null);
+            cb();
         };
     }
 
+
     findDominantFrequency(frequencyData) {
-        let totalAmplitude = 0;
-        let weightedSum = 0;
+        // Use the peak bin within a speech-focused band.
+        // This is still a simplification, but it is far more stable than scanning the whole spectrum.
+        const binHz = this.playAudioContext.sampleRate / this.analyser.fftSize;
+
+        const minHz = 80;
+        const maxHz = 3000;
+        const minBin = Math.max(1, Math.floor(minHz / binHz));
+        const maxBin = Math.min(frequencyData.length - 1, Math.ceil(maxHz / binHz));
+
         let maxAmplitude = 0;
         let maxIdx = -1;
+        let totalAmplitude = 0;
 
-        // Iterate over the frequency data to find the maximum amplitude
-        for (let i = 0; i < frequencyData.length; i++) {
-            const frequency = i * (this.playAudioContext.sampleRate / this.analyser.fftSize);  // Frequency corresponding to the FFT bin
+        for (let i = minBin; i <= maxBin; i++) {
             const amplitude = frequencyData[i];
-
-            // Find the maximum amplitude (dominant frequency)
+            totalAmplitude += amplitude;
             if (amplitude > maxAmplitude) {
                 maxAmplitude = amplitude;
                 maxIdx = i;
             }
-
-            // Weighted sum for average frequency calculation
-            weightedSum += frequency * amplitude;
-            totalAmplitude += amplitude;
         }
 
-        // Calculate the average frequency (weighted by amplitude)
-        const averageFrequency = totalAmplitude > 0 ? Math.floor(weightedSum / totalAmplitude) : NaN;
+        // If totalAmplitude is too low, return NaN to avoid unstable results
+        if (totalAmplitude < 50) return NaN;
 
-        // If totalAmplitude is too low, return NaN to avoid errors
-        if (totalAmplitude < 2000) return NaN;
 
-        // Calculate and return the dominant frequency based on the max amplitude
-        return Math.floor(maxIdx * (this.playAudioContext.sampleRate / this.analyser.fftSize));
+        return Math.floor(maxIdx * binHz);
     }
+
 
     // Function to detect a viseme based on frequency
     detectVisemeFromFrequency(frequency) {

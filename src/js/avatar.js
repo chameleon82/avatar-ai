@@ -168,9 +168,15 @@ class Avatar {
 
     // animate speech
     animateMouthSmoothly() {
-        if (this.wolfAvatar && this.wolfAvatar.morphTargetDictionary) {
-            this.wolfAvatar.mouthSmileLeft = 1
+        if (this.wolfAvatar && this.wolfAvatar.morphTargetDictionary && this.wolfAvatar.morphTargetInfluences) {
+            // If you want a constant smile, do it via morph targets (not via a non-existent property).
+            const smileIndex = this.wolfAvatar.morphTargetDictionary.mouthSmile;
+            if (smileIndex !== undefined) {
+                this.wolfAvatar.morphTargetInfluences[smileIndex] = 0.3;
+            }
+
             const targetIndex = this.wolfAvatar.morphTargetDictionary['viseme_' + this.currentViseme];
+
             // Reset all other visemes gradually
             Object.keys(this.wolfAvatar.morphTargetDictionary).forEach((visemeKey) => {
                 const index = this.wolfAvatar.morphTargetDictionary[visemeKey];
