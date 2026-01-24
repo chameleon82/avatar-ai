@@ -16,6 +16,8 @@
 
     <script src="src/js/pcm16Audio.js"></script>
     <script src="src/js/avatar.js"></script>
+    <script src="src/js/camera.js"></script>
+
 
     <!--<script src="https://cdn.jsdelivr.net/npm/meyda@5.0.0/dist/web/meyda.min.js"></script> -->
 </head>
@@ -23,10 +25,30 @@
 <div class="input-container">
     <label for="inputField" class="visually-hidden">Ask me anything</label>
     <textarea placeholder="Ask me anything here" name="text" id="inputField" rows="4"></textarea>
+
     <button id="mic" class="mic" aria-label="Start voice input" aria-controls="inputField">
         <i class="fa-solid fa-microphone"></i>
     </button>
+
+    <button id="cam" class="mic" aria-label="Toggle camera" title="Toggle camera">
+        <i class="fa-solid fa-camera"></i>
+    </button>
 </div>
+
+<!-- Small camera preview (64x64) -->
+<video id="camPreview" width="64" height="64" style="
+    position: fixed;
+    right: 12px;
+    bottom: 90px;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.25);
+    object-fit: cover;
+    display: none;
+    z-index: 9999;
+" autoplay playsinline muted></video>
+
 
 
 <!-- Modal Structure -->
@@ -59,6 +81,90 @@
     let avatar = new Avatar("./src/assets/avatar-w.glb");
   //  let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
     let socket;
+
+    // Camera -> periodic 64x64 frames to OpenAI (vision)
+    // NOTE: your realtime model must support image inputs. If you see errors, switch the model
+    // in the websocket URL to a vision-capable realtime model.
+    const camPreviewEl = document.getElementById('camPreview');
+    const cameraStreamer = new CameraStreamer({
+        width: 128,
+        height: 128,
+        fps: 2,
+        jpegQuality: 0.6,
+        facingMode: 'user',
+        previewVideoEl: camPreviewEl,
+        onFrame: (dataUrl) => {
+            // IMPORTANT: images are only captured while we decide “user is speaking”.
+            // Still guard against socket state.
+            if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+            // Send an image message WITHOUT requesting a response each time.
+            // (Keeps bandwidth and token usage sane.)
+            const evt = {
+                event_id: "event_" + eventId++,
+                type: "conversation.item.create",
+                previous_item_id: null,
+                item: {
+                    type: "message",
+                    role: "user",
+                    content: [
+                        {
+                            type: "input_image",
+                            image_url: dataUrl
+                        }
+                    ]
+                }
+            };
+            socket.send(JSON.stringify(evt));
+        },
+        onError: (e) => {
+            console.error('[camera] error', e);
+            // If user blocks permissions, revert UI state.
+            const btn = document.getElementById('cam');
+            btn?.classList.remove('recording');
+            cameraEnabled = false;
+            stopCameraCapture();
+        }
+    });
+
+    // Camera policy:
+    // - You manually enable/disable camera via the camera button.
+    // - When enabled, we ONLY capture/send frames while you are speaking (server VAD events).
+    // This avoids burning tokens while you are silent.
+    let cameraEnabled = false;
+    let cameraCapturing = false;
+    let cameraStopTimerId = null;
+    const CAMERA_TAIL_MS = 1500; // keep a tiny tail after speech stops
+
+    async function startCameraCapture() {
+        if (!cameraEnabled || cameraCapturing) return;
+        cameraCapturing = true;
+        // Camera stays ON; only start capture (frames) here.
+        await cameraStreamer.startCapture();
+    }
+
+    function stopCameraCapture() {
+        cameraCapturing = false;
+        if (cameraStopTimerId) {
+            clearTimeout(cameraStopTimerId);
+            cameraStopTimerId = null;
+        }
+        // Stop capture only (no frames, no sending), but keep webcam stream alive.
+        cameraStreamer.stopCapture();
+    }
+
+    async function ensureCameraOn() {
+        if (!cameraEnabled) return;
+        if (camPreviewEl) camPreviewEl.style.display = 'block';
+        await cameraStreamer.startCamera();
+    }
+
+
+    function scheduleStopCameraCapture(ms) {
+        if (cameraStopTimerId) clearTimeout(cameraStopTimerId);
+        cameraStopTimerId = setTimeout(() => stopCameraCapture(), ms);
+    }
+
 
     async function init() {
 
@@ -215,6 +321,25 @@
         socket.onmessage = (event) => {
             let response = JSON.parse(event.data)
             //console.log(response)
+
+            // Speech start/stop signals from server VAD.
+            // Different model versions may use slightly different event type strings,
+            // so we handle a small set.
+            if (response["type"] === "input_audio_buffer.speech_started" || response["type"] === "speech_started") {
+                // Start sending camera frames only while user is speaking.
+                startCameraCapture();
+                return;
+            }
+            if (
+                response["type"] === "input_audio_buffer.speech_stopped" ||
+                response["type"] === "input_audio_buffer.speech_ended" ||
+                response["type"] === "speech_stopped"
+            ) {
+                // Stop shortly after speech ends.
+                scheduleStopCameraCapture(CAMERA_TAIL_MS);
+                return;
+            }
+
             if (response["type"] === "response.audio_transcript.delta") {
                 // animateWord(response["delta"]) // not synced
             } else if (response["type"] === "response.audio_transcript.done") {
@@ -228,10 +353,13 @@
             }
 
         }
+
         socket.onclose = () => {
             avatar.setSleep(true)
+            stopCameraCapture();
             console.debug("Disconnected from OpenAI WebSocket");
         }
+
         socket.onerror = (error) => console.error("WebSocket Error:", error);
     }
 
@@ -291,7 +419,8 @@
 
     // Mic button:
     // - starts/stops mic streaming to OpenAI (as before)
-    // - ALSO enables mic-driven lip-sync (temporarily disables TTS-driven lip-sync)
+    // - Camera frames are NOT sent just because mic is on;
+    //   they are sent only while server VAD says you are speaking.
     document.getElementById('mic').addEventListener('click', async () => {
         const recClass = "recording"
         const el = document.getElementById('mic').classList
@@ -303,14 +432,62 @@
             await recorder.start()
           //       await recorder.startMicVisemes()
 
+            // Ensure realtime socket is up (needed to receive speech_started/stopped events)
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                try {
+                    initAI();
+                } catch (_) {
+                }
+            }
+
+            // If camera is enabled, keep webcam ON (preview), but still only SEND while speech is detected.
+            await ensureCameraOn();
+
         } else {
             el.remove(recClass)
 
-             recorder.stopMicVisemes()
-             recorder.enablePlaybackVisemes = true
-           // return recorder.stop()
+            recorder.stopMicVisemes()
+            recorder.enablePlaybackVisemes = true
+
+            // Stop sending frames. Keep webcam ON if camera is enabled.
+            stopCameraCapture();
         }
     });
+
+
+    // Camera button: enable/disable camera feature.
+    // Actual capture/send happens only while you are speaking.
+    document.getElementById('cam').addEventListener('click', async () => {
+        const recClass = "recording";
+        const btnClassList = document.getElementById('cam').classList;
+
+        if (!btnClassList.contains(recClass)) {
+            btnClassList.add(recClass);
+            cameraEnabled = true;
+
+            // Turn webcam ON immediately (preview), but do not start capture.
+            await ensureCameraOn();
+
+            // Ensure realtime socket is up (needed for VAD events)
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                try {
+                    initAI();
+                } catch (_) {
+                }
+            }
+        } else {
+            btnClassList.remove(recClass);
+            cameraEnabled = false;
+
+            // Stop capture AND turn webcam off.
+            stopCameraCapture();
+            cameraStreamer.stopCamera();
+            if (camPreviewEl) camPreviewEl.style.display = 'none';
+        }
+    });
+
+
+
 
 
     window.onload = init;
