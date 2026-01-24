@@ -22,6 +22,16 @@
     <!--<script src="https://cdn.jsdelivr.net/npm/meyda@5.0.0/dist/web/meyda.min.js"></script> -->
 </head>
 <body>
+<div class="top-controls">
+    <button id="fullscreen" class="mic" aria-label="Fullscreen" title="Fullscreen">
+        <i class="fa-solid fa-expand"></i>
+    </button>
+
+    <button id="settings" class="mic" aria-label="Settings" title="Settings">
+        <i class="fa-solid fa-gear"></i>
+    </button>
+</div>
+
 <div class="input-container">
     <label for="inputField" class="visually-hidden">Ask me anything</label>
     <textarea placeholder="Ask me anything here" name="text" id="inputField" rows="4"></textarea>
@@ -34,10 +44,9 @@
         <i class="fa-solid fa-camera"></i>
     </button>
 
-    <button id="settings" class="mic" aria-label="Settings" title="Settings">
-        <i class="fa-solid fa-gear"></i>
-    </button>
 </div>
+
+
 
 
 <!-- Small camera preview (64x64) -->
@@ -126,6 +135,85 @@
   //  let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
     let socket;
 
+    // ---- Prevent device sleep while this page is open (Screen Wake Lock) ----
+    // Notes:
+    // - Requires a user gesture to activate in most browsers.
+    // - Only supported on some browsers (Chrome/Edge/Android). Safe no-op elsewhere.
+    let wakeLock = null;
+    let wakeLockRequested = false;
+
+    async function requestWakeLock() {
+        if (!('wakeLock' in navigator)) return;
+        if (wakeLock) return;
+        try {
+            wakeLock = await navigator.wakeLock.request('screen');
+            wakeLock.addEventListener('release', () => {
+                wakeLock = null;
+            });
+        } catch (e) {
+            // Usually fails if not triggered by a user gesture or if OS/browser disallows it.
+            // We intentionally keep silent here.
+        }
+    }
+
+    function setupWakeLock() {
+        if (wakeLockRequested) return;
+        wakeLockRequested = true;
+
+        // Try on first user interaction
+        const activate = () => {
+            requestWakeLock();
+            document.removeEventListener('click', activate, true);
+            document.removeEventListener('keydown', activate, true);
+            document.removeEventListener('touchstart', activate, true);
+        };
+        document.addEventListener('click', activate, true);
+        document.addEventListener('keydown', activate, true);
+        document.addEventListener('touchstart', activate, true);
+
+        // Re-acquire when returning to the tab
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                // Lock is typically released when tab goes to background.
+                wakeLock = null;
+                requestWakeLock();
+            }
+        });
+    }
+
+    // ---- Fullscreen toggle ----
+    // Fullscreen also requires a user gesture.
+    async function toggleFullscreen() {
+        try {
+            const doc = document;
+            const el = document.documentElement;
+
+            const isFs = doc.fullscreenElement || doc.webkitFullscreenElement;
+            if (isFs) {
+                if (doc.exitFullscreen) return await doc.exitFullscreen();
+                if (doc.webkitExitFullscreen) return await doc.webkitExitFullscreen();
+                return;
+            }
+
+            if (el.requestFullscreen) return await el.requestFullscreen();
+            if (el.webkitRequestFullscreen) return await el.webkitRequestFullscreen();
+        } catch (_) {
+        }
+    }
+
+    function updateFullscreenIcon() {
+        const btn = document.getElementById('fullscreen');
+        if (!btn) return;
+        const icon = btn.querySelector('i');
+        if (!icon) return;
+
+        const isFs = document.fullscreenElement || document.webkitFullscreenElement;
+        icon.classList.remove('fa-expand', 'fa-compress');
+        icon.classList.add(isFs ? 'fa-compress' : 'fa-expand');
+    }
+
+
+
     // Camera -> periodic 64x64 frames to OpenAI (vision)
     // NOTE: your realtime model must support image inputs. If you see errors, switch the model
     // in the websocket URL to a vision-capable realtime model.
@@ -212,7 +300,24 @@
 
     async function init() {
 
+        // Keep device awake while this page is used (requires user gesture to actually lock)
+        setupWakeLock();
+
+        // Fullscreen button
+        const fullscreenBtn = document.getElementById('fullscreen');
+        if (fullscreenBtn) {
+            fullscreenBtn.addEventListener('click', async () => {
+                await toggleFullscreen();
+                updateFullscreenIcon();
+            });
+        }
+        document.addEventListener('fullscreenchange', updateFullscreenIcon);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+        updateFullscreenIcon();
+
         const inputField = document.getElementById('inputField');
+
+
 
         function onEnterKey(event) {
             if (event.key === 'Enter') {

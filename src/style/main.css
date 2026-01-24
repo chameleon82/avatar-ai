@@ -227,3 +227,23 @@ button.mic:hover {
     border: 0;
 }
 
+/* Top-right controls */
+.top-controls {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 10000;
+    display: flex;
+    gap: 10px;
+}
+
+@media (max-width: 600px) {
+    .top-controls {
+        top: 10px;
+        right: 10px;
+        gap: 8px;
+    }
+}
+
+
+
