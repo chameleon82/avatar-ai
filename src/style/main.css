@@ -23,7 +23,7 @@ canvas {
 }
 
 /* Textarea & Input Fields */
-textarea, .modal input[type="password"] {
+textarea, .modal input[type="password"], .modal input[type="text"] {
     width: 100%;
     background: #0d0d0d;
     color: #00ffea;
