@@ -705,12 +705,25 @@
         } else {
             el.remove(recClass)
 
-            recorder.stopMicVisemes()
+            // Stop streaming microphone audio to OpenAI
+            recorder.stop();
             recorder.enablePlaybackVisemes = true
+
+            // Optional: clear any audio buffered on the server side
+            try {
+                if (socket && socket.readyState === WebSocket.OPEN) {
+                    socket.send(JSON.stringify({
+                        event_id: "event_" + eventId++,
+                        type: "input_audio_buffer.clear"
+                    }));
+                }
+            } catch (_) {
+            }
 
             // Stop sending frames. Keep webcam ON if camera is enabled.
             stopCameraCapture();
         }
+
     });
 
 
