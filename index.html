@@ -278,28 +278,40 @@
             // Convert the byte array to a string of characters for base64 encoding
             const byteString = String.fromCharCode.apply(null, byteArray);
             // redirect to processing
-//        recorder.addPlayChunk(bytesToPcm(byteString)) // send mic instead for testing
-            socket.send(JSON.stringify(
-                {
-                    "event_id": "event_" + eventId++,
-                    "type": "input_audio_buffer.append",
-                    "audio": btoa(byteString)
-                }
-            )); // Send raw PCM16 binary data
+          // recorder.addPlayChunk(bytesToPcm(byteString)) // send mic instead for testing
+          //   socket.send(JSON.stringify(
+          //       {
+          //           "event_id": "event_" + eventId++,
+          //           "type": "input_audio_buffer.append",
+          //           "audio": btoa(byteString)
+          //       }
+          //   )); // Send raw PCM16 binary data
         }, viseme => avatar.setViseme(viseme)
     )
 
-    document.getElementById('mic').addEventListener('click', () => {
+    // Mic button:
+    // - starts/stops mic streaming to OpenAI (as before)
+    // - ALSO enables mic-driven lip-sync (temporarily disables TTS-driven lip-sync)
+    document.getElementById('mic').addEventListener('click', async () => {
         const recClass = "recording"
         const el = document.getElementById('mic').classList
         if (!el.contains(recClass)) {
             el.add(recClass)
-            return recorder.start()
+
+            // Switch lip-sync to mic for testing
+           // recorder.enablePlaybackVisemes = false
+          //  await recorder.start()
+                 await recorder.startMicVisemes()
+
         } else {
             el.remove(recClass)
-            return recorder.stop()
+
+             recorder.stopMicVisemes()
+             recorder.enablePlaybackVisemes = true
+           // return recorder.stop()
         }
     });
+
 
     window.onload = init;
 </script>
