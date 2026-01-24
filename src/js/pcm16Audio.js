@@ -47,7 +47,7 @@ class PCM16Audio {
         // Create an analyser node for frequency analysis
         this.analyser = this.playAudioContext.createAnalyser();
         this.analyser.fftSize = 1024; // Balance between frequency resolution and responsiveness
-        this.analyser.smoothingTimeConstant = 0.25; // More smoothing => less jitter in dominant frequency
+        this.analyser.smoothingTimeConstant = 0.10; // Lower smoothing => less latency (slightly more jitter)
 
 
         // use chunk audio instead of analyzed for smoother voice. ideally those should sync good enough
@@ -66,8 +66,8 @@ class PCM16Audio {
         this._lastVisemeEmitTs = 0;
 
         // Tuning knobs
-        this._analysisIntervalMs = 33; // ~30 fps: smoother and less jittery
-        this._minHoldMs = 70; // hold viseme longer to avoid rapid toggling
+        this._analysisIntervalMs = 16; // ~60 fps: lower viseme latency
+        this._minHoldMs = 45; // a bit more hold to reduce jitter
         this._confirmFrames = 2; // require 2 consecutive frames to switch
         this._silenceRms = 0.010; // reduce micro-noise triggering
 
@@ -408,6 +408,18 @@ class PCM16Audio {
         // Tightened further based on mic logs: "И" can reach highRatio ~0.6 with airRatio ~0.18–0.28.
         // Treat as fricative only when both are clearly high.
         if ((highRatio > 0.60 && airRatio > 0.30) || (Number.isFinite(centroid) && centroid > 2600)) {
+            // "В" (voiced labiodental fricative) can look very airy but is not a sibilant.
+            // Your logs: centroid ~2450–2550, airRatio ~0.39–0.41, with some mid energy.
+            // Prefer FF over SS in that region.
+            if (
+                airRatio > 0.33 &&
+                Number.isFinite(centroid) &&
+                centroid >= 2200 && centroid < 3000 &&
+                midRatio > 0.12
+            ) {
+                return 'FF';
+            }
+
             // Very airy / very high centroid => SS
             // Raise air threshold a bit: some "И" frames can have moderate air without being a fricative.
             if (airRatio > 0.33 || (Number.isFinite(centroid) && centroid > 4200)) return 'SS';
@@ -458,6 +470,11 @@ class PCM16Audio {
             return 'O';
         }
 
+        // "Р" helper: sustained Russian "р" (trill/tap) tends to be mid-heavy with some air.
+        // Without this it often gets pulled into E/aa vowel buckets.
+        if (centroid >= 850 && centroid < 1800 && midRatio > 0.34 && airRatio > 0.08 && airRatio < 0.28 && highRatio < 0.55) {
+            return 'RR';
+        }
 
         // --- Helpers for Russian vowels on this mic ---
 
