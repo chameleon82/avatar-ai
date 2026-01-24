@@ -6,3 +6,6 @@ install `npm`
 
 See details on: https://github.com/readyplayerme/visage
 
+#### TODO
+
+integrate with https://github.com/alphacep/vosk-api
