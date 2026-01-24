@@ -23,7 +23,7 @@ canvas {
 }
 
 /* Textarea & Input Fields */
-textarea, .modal input[type="password"] {
+textarea, .modal input[type="password"], .modal input[type="text"] {
     width: 100%;
     background: #0d0d0d;
     color: #00ffea;
@@ -60,11 +60,7 @@ button.mic, button.recording, .modal button {
     transition: 0.3s ease-in-out;
 }
 
-button.mic {
-    background: #0d0d0d;
-    color: #00ffea;
-    @extend .neon-border;
-}
+
 
 button.recording {
     background: #ff0000;
@@ -96,12 +92,18 @@ button.recording {
     background: #0d0d0d;
     margin: 5% auto;
     padding: 30px;
-    @extend .neon-border;
+
+    /* Equivalent of .neon-border (was @extend, which is SCSS-only) */
+    border: 2px solid #00ffea;
+    box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
+    transition: 0.3s;
+
     width: 80%;
     max-width: 600px;
     color: #00ffea;
     font-family: 'Orbitron', sans-serif;
 }
+
 
 .modal button {
     margin-top: 5px;
@@ -214,5 +216,14 @@ button.mic:hover {
 }
 
 .visually-hidden {
-    display: none;
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
 }
+

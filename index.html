@@ -16,6 +16,8 @@
 
     <script src="src/js/pcm16Audio.js"></script>
     <script src="src/js/avatar.js"></script>
+    <script src="src/js/camera.js"></script>
+
 
     <!--<script src="https://cdn.jsdelivr.net/npm/meyda@5.0.0/dist/web/meyda.min.js"></script> -->
 </head>
@@ -23,42 +25,190 @@
 <div class="input-container">
     <label for="inputField" class="visually-hidden">Ask me anything</label>
     <textarea placeholder="Ask me anything here" name="text" id="inputField" rows="4"></textarea>
+
     <button id="mic" class="mic" aria-label="Start voice input" aria-controls="inputField">
         <i class="fa-solid fa-microphone"></i>
+    </button>
+
+    <button id="cam" class="mic" aria-label="Toggle camera" title="Toggle camera">
+        <i class="fa-solid fa-camera"></i>
+    </button>
+
+    <button id="settings" class="mic" aria-label="Settings" title="Settings">
+        <i class="fa-solid fa-gear"></i>
     </button>
 </div>
 
 
-<!-- Modal Structure -->
+<!-- Small camera preview (64x64) -->
+<video id="camPreview" width="64" height="64" style="
+    position: fixed;
+    right: 12px;
+    bottom: 90px;
+    width: 64px;
+    height: 64px;
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.25);
+    object-fit: cover;
+    display: none;
+    z-index: 9999;
+" autoplay playsinline muted></video>
+
+
+
+<!-- Settings Modal -->
 <div id="modal" class="modal">
     <div class="modal-content">
-        <h2>Please enter your OpenAI API Key</h2>
-        <p>This project is free and require connection to OpenAI API. You can create the key
-            <a target="_blank" href="https://platform.openai.com/settings/organization/api-keys">here</a>. You MUST
-            have positive balance on the openai account and give permissions to work with realtime-api.
-            <br/>
-            Api key will be stored in the cookies for 7 days. By submitting you will accept allowing to store and access
-            cookies by this application. If you no longer want to continue or want to change api key - please clean the
-            cookies.
+        <h2>Settings</h2>
+        <p>
+            Configure OpenAI connection settings. Note: storing an API key in the browser is not secure.
+            Use “Remember API key” only on a trusted device.
         </p>
+
+        <label for="baseUrlInput" style="display:block;margin-top:10px;">OpenAI Base URL</label>
         <input
-                type="password"
-                id="apiKeyInput"
-                placeholder="Enter API Key"
+                type="text"
+                id="baseUrlInput"
+                placeholder="https://api.openai.com"
                 autocomplete="off"
                 autocorrect="off"
                 spellcheck="false"
-                aria-label="API Key input"
-                required/>
-        <button id="submitApiKey">Submit</button>
-        <button id="cancelApiKey">Cancel</button>
+                aria-label="OpenAI Base URL input"/>
+
+        <label for="modelInput" style="display:block;margin-top:10px;">Realtime model</label>
+        <input
+                type="text"
+                id="modelInput"
+                placeholder="gpt-realtime-mini"
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+                aria-label="Realtime model input"/>
+
+        <label for="apiKeyInput" style="display:block;margin-top:10px;">OpenAI API Key</label>
+        <input
+                type="password"
+                id="apiKeyInput"
+                placeholder="sk-..."
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+                aria-label="API Key input"/>
+
+        <div style="margin-top:10px;display:flex;gap:10px;align-items:center;">
+            <input type="checkbox" id="rememberKey" />
+            <label for="rememberKey">Remember API key on this device</label>
+        </div>
+
+        <label for="customInstructionsInput" style="display:block;margin-top:10px;">Custom instructions (optional)</label>
+        <textarea
+                id="customInstructionsInput"
+                rows="6"
+                placeholder="Extra behavior rules for Milena…"
+                autocomplete="off"
+                autocorrect="off"
+                spellcheck="false"
+                aria-label="Custom instructions input"
+                style="width:100%;resize:vertical;"></textarea>
+
+
+        <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;">
+            <button id="saveSettings">Save</button>
+            <button id="cancelSettings">Cancel</button>
+            <button id="clearSettings" style="margin-left:auto;">Clear saved key</button>
+        </div>
     </div>
 </div>
+
 
 <script>
     let avatar = new Avatar("./src/assets/avatar-w.glb");
   //  let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
     let socket;
+
+    // Camera -> periodic 64x64 frames to OpenAI (vision)
+    // NOTE: your realtime model must support image inputs. If you see errors, switch the model
+    // in the websocket URL to a vision-capable realtime model.
+    const camPreviewEl = document.getElementById('camPreview');
+    const cameraStreamer = new CameraStreamer({
+        width: 128,
+        height: 128,
+        fps: 2,
+        jpegQuality: 0.6,
+        facingMode: 'user',
+        previewVideoEl: camPreviewEl,
+        onFrame: (dataUrl) => {
+            // IMPORTANT: images are only captured while we decide “user is speaking”.
+            // Still guard against socket state.
+            if (!socket || socket.readyState !== WebSocket.OPEN) return;
+
+            // Send an image message WITHOUT requesting a response each time.
+            // (Keeps bandwidth and token usage sane.)
+            const evt = {
+                event_id: "event_" + eventId++,
+                type: "conversation.item.create",
+                previous_item_id: null,
+                item: {
+                    type: "message",
+                    role: "user",
+                    content: [
+                        {
+                            type: "input_image",
+                            image_url: dataUrl
+                        }
+                    ]
+                }
+            };
+            socket.send(JSON.stringify(evt));
+        },
+        onError: (e) => {
+            console.error('[camera] error', e);
+            // If user blocks permissions, revert UI state.
+            const btn = document.getElementById('cam');
+            btn?.classList.remove('recording');
+            cameraEnabled = false;
+            stopCameraCapture();
+        }
+    });
+
+    // Camera policy:
+    // - You manually enable/disable camera via the camera button.
+    // - When enabled, we ONLY capture/send frames while you are speaking (server VAD events).
+    // This avoids burning tokens while you are silent.
+    let cameraEnabled = false;
+    let cameraCapturing = false;
+    let cameraStopTimerId = null;
+    const CAMERA_TAIL_MS = 1500; // keep a tiny tail after speech stops
+
+    async function startCameraCapture() {
+        if (!cameraEnabled || cameraCapturing) return;
+        cameraCapturing = true;
+        // Camera stays ON; only start capture (frames) here.
+        await cameraStreamer.startCapture();
+    }
+
+    function stopCameraCapture() {
+        cameraCapturing = false;
+        if (cameraStopTimerId) {
+            clearTimeout(cameraStopTimerId);
+            cameraStopTimerId = null;
+        }
+        // Stop capture only (no frames, no sending), but keep webcam stream alive.
+        cameraStreamer.stopCapture();
+    }
+
+    async function ensureCameraOn() {
+        if (!cameraEnabled) return;
+        if (camPreviewEl) camPreviewEl.style.display = 'block';
+        await cameraStreamer.startCamera();
+    }
+
+
+    function scheduleStopCameraCapture(ms) {
+        if (cameraStopTimerId) clearTimeout(cameraStopTimerId);
+        cameraStopTimerId = setTimeout(() => stopCameraCapture(), ms);
+    }
+
 
     async function init() {
 
@@ -88,78 +238,186 @@
     }
 
 
-    // Function to get a cookie by name
-    function getCookie(name) {
-        const value = `; ${document.cookie}`;
-        const parts = value.split(`; ${name}=`);
-        if (parts.length === 2) return parts.pop().split(';').shift();
-        return null;
+    // ---- Settings (no backend) ----
+    // Stored in localStorage under SETTINGS_KEY.
+    // Security note: anything stored in localStorage is readable by any JS on this origin.
+    const SETTINGS_KEY = 'openaiSettings';
+
+    const defaultSettings = {
+        baseUrl: 'https://api.openai.com',
+        model: 'gpt-realtime-mini',
+        rememberKey: false,
+        apiKey: '',
+        customInstructions: ''
+    };
+
+    function loadSettings() {
+        try {
+            const raw = localStorage.getItem(SETTINGS_KEY);
+            if (!raw) return {...defaultSettings};
+            const parsed = JSON.parse(raw);
+            return {...defaultSettings, ...parsed};
+        } catch (e) {
+            return {...defaultSettings};
+        }
     }
 
-    // Function to set a cookie
-    function setCookie(name, value, days) {
-        const d = new Date();
-        d.setTime(d.getTime() + (days * 24 * 60 * 60 * 1000));
-        const expires = "expires=" + d.toUTCString();
-        document.cookie = `${name}=${value}; ${expires}; path=/`;
+    function saveSettings(settingsObj) {
+        localStorage.setItem(SETTINGS_KEY, JSON.stringify(settingsObj));
     }
 
-    function deleteCookie(name, domain) {
-        // Set the cookie with an expiration date in the past to delete it
-        document.cookie = name + "=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;";
+    function clearSavedKey() {
+        const s = loadSettings();
+        s.apiKey = '';
+        s.rememberKey = false;
+        saveSettings(s);
     }
 
-    // deleteCookie('openaiApiKey');
+    function normalizeBaseUrl(input) {
+        const trimmed = (input || '').trim();
+        if (!trimmed) return defaultSettings.baseUrl;
+        return trimmed;
+    }
 
+    function buildRealtimeWsUrl(baseUrl, model) {
+        const m = (model || defaultSettings.model).trim();
+        const b = normalizeBaseUrl(baseUrl);
 
-    // Get openaiApiKey from cookies
-    let openaiApiKey = getCookie('openaiApiKey');
+        try {
+            // Accept https://api..., http://..., ws://..., wss://...
+            const u = new URL(b);
+            const wsProto = (u.protocol === 'http:' || u.protocol === 'ws:') ? 'ws:' : 'wss:';
+            const wsOrigin = wsProto + '//' + u.host;
+            return wsOrigin + '/v1/realtime?model=' + encodeURIComponent(m);
+        } catch (e) {
+            // Fallback
+            return 'wss://api.openai.com/v1/realtime?model=' + encodeURIComponent(m);
+        }
+    }
 
-    // If the API key is not in cookies, show the modal
-    if (!openaiApiKey) {
+    // In-memory session config
+    let settings = loadSettings();
+    let openaiApiKey = settings.rememberKey ? (settings.apiKey || '') : '';
+
+    function showSettingsModal({force = false} = {}) {
         const modal = document.getElementById('modal');
-        const submitButton = document.getElementById('submitApiKey');
-        const cancelButton = document.getElementById('cancelApiKey');
-        const inputField = document.getElementById('apiKeyInput');
+        const baseUrlInput = document.getElementById('baseUrlInput');
+        const modelInput = document.getElementById('modelInput');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const rememberKeyEl = document.getElementById('rememberKey');
+        const customInstructionsInput = document.getElementById('customInstructionsInput');
 
-        // Show the modal
-        modal.style.display = "block";
+        baseUrlInput.value = settings.baseUrl || defaultSettings.baseUrl;
+        modelInput.value = settings.model || defaultSettings.model;
+        apiKeyInput.value = openaiApiKey || '';
+        rememberKeyEl.checked = !!settings.rememberKey;
+        if (customInstructionsInput) customInstructionsInput.value = settings.customInstructions || '';
 
-        // Handle Submit button
-        submitButton.onclick = function () {
-            openaiApiKey = inputField.value;
-            if (openaiApiKey) {
-                // Store the API key in a cookie for 7 days
-                setCookie('openaiApiKey', openaiApiKey, 7);
-                modal.style.display = "none"; // Close the modal after submission
-                initAI();
-            } else {
-                alert("API Key is required.");
-            }
+        modal.dataset.force = force ? '1' : '0';
+        modal.style.display = 'block';
+    }
+
+
+    function hideSettingsModal() {
+        document.getElementById('modal').style.display = 'none';
+    }
+
+    document.getElementById('saveSettings').onclick = function () {
+        const baseUrlInput = document.getElementById('baseUrlInput');
+        const modelInput = document.getElementById('modelInput');
+        const apiKeyInput = document.getElementById('apiKeyInput');
+        const rememberKeyEl = document.getElementById('rememberKey');
+        const customInstructionsInput = document.getElementById('customInstructionsInput');
+
+        const next = {
+            baseUrl: normalizeBaseUrl(baseUrlInput.value),
+            model: (modelInput.value || defaultSettings.model).trim(),
+            rememberKey: !!rememberKeyEl.checked,
+            apiKey: '',
+            customInstructions: (customInstructionsInput ? (customInstructionsInput.value || '') : '').trim()
+        };
+
+
+        openaiApiKey = (apiKeyInput.value || '').trim();
+        if (next.rememberKey) next.apiKey = openaiApiKey;
+
+        settings = next;
+        saveSettings(settings);
+
+        if (!openaiApiKey) {
+            alert('API Key is required.');
+            showSettingsModal({force: true});
+            return;
         }
 
-        // Handle Cancel button
-        cancelButton.onclick = function () {
-            modal.style.display = "none"; // Close the modal on cancel
-        }
+        hideSettingsModal();
 
-        // Close modal if user clicks outside of it
-        window.onclick = function (event) {
-            if (event.target === modal) {
-                modal.style.display = "none";
-            }
+        try {
+            if (socket && socket.readyState === WebSocket.OPEN) socket.close();
+        } catch (_) {
         }
+        initAI();
+    };
+
+    document.getElementById('cancelSettings').onclick = function () {
+        const modal = document.getElementById('modal');
+        const forced = modal.dataset.force === '1';
+        if (forced && !openaiApiKey) return;
+        hideSettingsModal();
+    };
+
+    document.getElementById('clearSettings').onclick = function () {
+        clearSavedKey();
+        settings = loadSettings();
+        openaiApiKey = '';
+        document.getElementById('apiKeyInput').value = '';
+        document.getElementById('rememberKey').checked = false;
+        alert('Saved key cleared.');
+    };
+
+    window.addEventListener('click', (event) => {
+        const modal = document.getElementById('modal');
+        if (event.target === modal) {
+            const forced = modal.dataset.force === '1';
+            if (forced && !openaiApiKey) return;
+            hideSettingsModal();
+        }
+    });
+
+    const settingsBtn = document.getElementById('settings');
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', () => {
+            settings = loadSettings();
+            if (settings.rememberKey) openaiApiKey = settings.apiKey || '';
+            showSettingsModal({force: false});
+        });
+    }
+
+    // Initial bootstrap
+    if (!openaiApiKey) {
+        showSettingsModal({force: true});
     } else {
         initAI();
     }
 
+
     var eventId = 1
+
+    const BASE_INSTRUCTIONS = "You are Milena, my close friend and smart companion. Your voice is heard through a synced avatar. Communication style: warm, natural, concise. Default to 1–3 short sentences. Never add end-of-message invitations or follow-ups. STRICTLY FORBIDDEN phrases (and similar): 'if you need more', 'if you have questions', 'feel free', 'let me know', 'reach out'. Do NOT close with pleasantries or meta lines. End after the useful content. Ask a question only if it is strictly required to proceed; ask at most one. Avoid meta talk, disclaimers, long preambles, and summaries. No bullet lists unless I ask. If I’m silent, stay silent. If I ask for code/config, give the exact change with minimal explanation.";
+
+    function buildInstructions() {
+        const extra = settings && settings.customInstructions ? String(settings.customInstructions).trim() : '';
+        if (!extra) return BASE_INSTRUCTIONS;
+        return BASE_INSTRUCTIONS + "\n\nUser custom instructions:\n" + extra;
+    }
 
     function initAI() {
 
+
+        const wsUrl = buildRealtimeWsUrl(settings.baseUrl, settings.model);
+
         socket = new WebSocket(
-            "wss://api.openai.com/v1/realtime?model=gpt-realtime-mini",
-            //"wss://api.openai.com/v1/realtime?model=gpt-4o-mini-realtime-preview-2024-12-17",
+            wsUrl,
             [
                 "realtime",
                 // Auth
@@ -167,6 +425,7 @@
                 // Beta protocol, required
                 "openai-beta.realtime-v1"
             ]);
+
 
         socket.onopen = () => {
             avatar.setSleep(false)
@@ -179,7 +438,8 @@
                    // "instructions": "You are a helpful AI assistant. Your name is Milena, you are woman-like. User see you as avatar and your speech is lips synced with avatar",
                   //  "instructions": "You are my vibrant and energetic friend, Milena! A 23-year-old woman with a bubbly personality, always ready with a joke or a fun fact to make me smile. You're full of life, witty, and always brightening up the conversation. I can see you as a woman avatar with lips perfectly synced to your speech. You're always positive, upbeat, and ready for a good time! Let's keep the energy high and the vibe exciting!",
                   //  "instructions": "You are Russian - Thai teacher, you teaching me Thai. Today's lesson - colors. Your task is to be sure I learn all colors! You should focus on my pronunciation to correct me. You should speak less",
-                    "instructions": "You are Personal Principal Engineer assistant. You are woman, your name is Milena",
+                    "instructions": buildInstructions(),
+
                     "voice": "sage",
                     "input_audio_format": "pcm16",
                     "output_audio_format": "pcm16",
@@ -215,6 +475,25 @@
         socket.onmessage = (event) => {
             let response = JSON.parse(event.data)
             //console.log(response)
+
+            // Speech start/stop signals from server VAD.
+            // Different model versions may use slightly different event type strings,
+            // so we handle a small set.
+            if (response["type"] === "input_audio_buffer.speech_started" || response["type"] === "speech_started") {
+                // Start sending camera frames only while user is speaking.
+                startCameraCapture();
+                return;
+            }
+            if (
+                response["type"] === "input_audio_buffer.speech_stopped" ||
+                response["type"] === "input_audio_buffer.speech_ended" ||
+                response["type"] === "speech_stopped"
+            ) {
+                // Stop shortly after speech ends.
+                scheduleStopCameraCapture(CAMERA_TAIL_MS);
+                return;
+            }
+
             if (response["type"] === "response.audio_transcript.delta") {
                 // animateWord(response["delta"]) // not synced
             } else if (response["type"] === "response.audio_transcript.done") {
@@ -228,10 +507,13 @@
             }
 
         }
+
         socket.onclose = () => {
             avatar.setSleep(true)
+            stopCameraCapture();
             console.debug("Disconnected from OpenAI WebSocket");
         }
+
         socket.onerror = (error) => console.error("WebSocket Error:", error);
     }
 
@@ -278,7 +560,7 @@
             // Convert the byte array to a string of characters for base64 encoding
             const byteString = String.fromCharCode.apply(null, byteArray);
             // redirect to processing
-//        recorder.addPlayChunk(bytesToPcm(byteString)) // send mic instead for testing
+      //    recorder.addPlayChunk(bytesToPcm(byteString)) // send mic instead for testing
             socket.send(JSON.stringify(
                 {
                     "event_id": "event_" + eventId++,
@@ -289,17 +571,78 @@
         }, viseme => avatar.setViseme(viseme)
     )
 
-    document.getElementById('mic').addEventListener('click', () => {
+    // Mic button:
+    // - starts/stops mic streaming to OpenAI (as before)
+    // - Camera frames are NOT sent just because mic is on;
+    //   they are sent only while server VAD says you are speaking.
+    document.getElementById('mic').addEventListener('click', async () => {
         const recClass = "recording"
         const el = document.getElementById('mic').classList
         if (!el.contains(recClass)) {
             el.add(recClass)
-            return recorder.start()
+
+            // Switch lip-sync to mic for testing
+           // recorder.enablePlaybackVisemes = false
+            await recorder.start()
+          //       await recorder.startMicVisemes()
+
+            // Ensure realtime socket is up (needed to receive speech_started/stopped events)
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                try {
+                    initAI();
+                } catch (_) {
+                }
+            }
+
+            // If camera is enabled, keep webcam ON (preview), but still only SEND while speech is detected.
+            await ensureCameraOn();
+
         } else {
             el.remove(recClass)
-            return recorder.stop()
+
+            recorder.stopMicVisemes()
+            recorder.enablePlaybackVisemes = true
+
+            // Stop sending frames. Keep webcam ON if camera is enabled.
+            stopCameraCapture();
         }
     });
+
+
+    // Camera button: enable/disable camera feature.
+    // Actual capture/send happens only while you are speaking.
+    document.getElementById('cam').addEventListener('click', async () => {
+        const recClass = "recording";
+        const btnClassList = document.getElementById('cam').classList;
+
+        if (!btnClassList.contains(recClass)) {
+            btnClassList.add(recClass);
+            cameraEnabled = true;
+
+            // Turn webcam ON immediately (preview), but do not start capture.
+            await ensureCameraOn();
+
+            // Ensure realtime socket is up (needed for VAD events)
+            if (!socket || socket.readyState !== WebSocket.OPEN) {
+                try {
+                    initAI();
+                } catch (_) {
+                }
+            }
+        } else {
+            btnClassList.remove(recClass);
+            cameraEnabled = false;
+
+            // Stop capture AND turn webcam off.
+            stopCameraCapture();
+            cameraStreamer.stopCamera();
+            if (camPreviewEl) camPreviewEl.style.display = 'none';
+        }
+    });
+
+
+
+
 
     window.onload = init;
 </script>
