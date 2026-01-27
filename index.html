@@ -645,12 +645,22 @@
         }
     }
 
-    // Convert the binary data to Int16Array (16-bit PCM)
+    // Convert the binary data to Int16Array (16-bit PCM, signed, little-endian)
     function bytesToPcm(binaryData) {
-        const pcm16Data = new Int16Array(binaryData.length / 2); // PCM16 is 2 bytes per sample
-        for (let i = 0; i < pcm16Data.length; i++)
-            pcm16Data[i] = (binaryData.charCodeAt(i * 2 + 1) << 8) | binaryData.charCodeAt(i * 2);
-        return pcm16Data
+        const sampleCount = binaryData.length / 2;
+        const pcm16Data = new Int16Array(sampleCount);
+
+        for (let i = 0; i < sampleCount; i++) {
+            const lo = binaryData.charCodeAt(i * 2);
+            const hi = binaryData.charCodeAt(i * 2 + 1);
+            let value = (hi << 8) | lo;
+
+            // Sign extension for 16-bit PCM
+            if (value & 0x8000) value -= 0x10000;
+
+            pcm16Data[i] = value;
+        }
+        return pcm16Data;
     }
 
     const recorder = new PCM16Audio(chunk => {
