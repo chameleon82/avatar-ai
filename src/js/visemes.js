@@ -145,7 +145,6 @@
     }
 
     function createOutputTracker({
-        audioContext,
         analyser,
         setViseme,
         detect = detectFromSpectrum,
@@ -158,9 +157,10 @@
         confirmFrames = 2,
         intervalMs = 16,
     }) {
-        if (!audioContext) throw new Error('Visemes.createOutputTracker: audioContext is required');
         if (!analyser) throw new Error('Visemes.createOutputTracker: analyser is required');
         if (!setViseme) throw new Error('Visemes.createOutputTracker: setViseme is required');
+
+        const ctx = analyser.context;
 
         analyser.fftSize = fftSize;
         analyser.smoothingTimeConstant = smoothingTimeConstant;
@@ -248,7 +248,7 @@
             if (intervalId) return;
 
             intervalId = setInterval(() => {
-                const now = audioContext.currentTime;
+                const now = ctx.currentTime;
                 if (activeUntilSec > 0 && now <= activeUntilSec) {
                     analyser.getByteTimeDomainData(time);
                     const rms = rmsFromTimeDomain(time);
@@ -258,7 +258,7 @@
                     }
 
                     analyser.getByteFrequencyData(freq);
-                    const viseme = detect(freq, audioContext.sampleRate, analyser.fftSize);
+                    const viseme = detect(freq, ctx.sampleRate, analyser.fftSize);
                     emitVisemeMaybe(viseme);
                     return;
                 }
@@ -271,7 +271,7 @@
             const until = startTime + duration;
             activeUntilSec = Math.max(activeUntilSec || 0, until);
 
-            const startDelayMs = Math.max(0, Math.round((startTime - audioContext.currentTime) * 1000));
+            const startDelayMs = Math.max(0, Math.round((startTime - ctx.currentTime) * 1000));
             if (!startTimeoutId) {
                 startTimeoutId = setTimeout(() => {
                     startTimeoutId = null;
@@ -279,7 +279,7 @@
                 }, startDelayMs);
             }
 
-            if (audioContext.currentTime >= startTime) {
+            if (ctx.currentTime >= startTime) {
                 ensureLoop();
             }
         }

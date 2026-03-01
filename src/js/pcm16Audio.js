@@ -68,6 +68,24 @@ class PCM16Audio {
         return this.outputGain;
     }
 
+    createOutputAnalyser({
+        fftSize,
+        smoothingTimeConstant,
+        minDecibels,
+        maxDecibels,
+    } = {}) {
+        const analyser = this.playAudioContext.createAnalyser();
+        this.outputNode.connect(analyser);
+
+        if (typeof fftSize === 'number') analyser.fftSize = fftSize;
+        if (typeof smoothingTimeConstant === 'number') analyser.smoothingTimeConstant = smoothingTimeConstant;
+        if (typeof minDecibels === 'number') analyser.minDecibels = minDecibels;
+        if (typeof maxDecibels === 'number') analyser.maxDecibels = maxDecibels;
+
+        return analyser;
+    }
+
+
     // start recording microphone
     async start() {
         // Avoid browser "voice call" processing (pumping/quacking)

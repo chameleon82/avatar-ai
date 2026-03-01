@@ -534,11 +534,9 @@ const recorder = new PCM16Audio(
 
 // ----- Output lip sync (visemes) -----
 // All viseme tracking logic and parameters live in visemes.js.
-const outputAnalyser = recorder.playAudioContext.createAnalyser();
-recorder.outputNode.connect(outputAnalyser);
+const outputAnalyser = recorder.createOutputAnalyser();
 
 const outputVisemeTracker = Visemes.createOutputTracker({
-    audioContext: recorder.playAudioContext,
     analyser: outputAnalyser,
     setViseme: (v) => avatar.setViseme(v),
 });
