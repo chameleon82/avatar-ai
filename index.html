@@ -663,26 +663,39 @@
         return pcm16Data;
     }
 
+    // Encode PCM16 (Int16Array) to base64 (little-endian bytes)
+    function pcm16ToBase64(pcm16) {
+        const bytes = new Uint8Array(pcm16.length * 2);
+        for (let i = 0; i < pcm16.length; i++) {
+            const v = pcm16[i];
+            bytes[i * 2] = v & 0xff;
+            bytes[i * 2 + 1] = (v >> 8) & 0xff;
+        }
+
+        // Convert to binary string in chunks to avoid call-stack / memory spikes.
+        let binary = '';
+        const chunkSize = 0x8000;
+        for (let i = 0; i < bytes.length; i += chunkSize) {
+            const sub = bytes.subarray(i, i + chunkSize);
+            binary += String.fromCharCode.apply(null, sub);
+        }
+        return btoa(binary);
+    }
+
     const recorder = new PCM16Audio(chunk => {
-            //if (socket.readyState === WebSocket.OPEN) {
-            const byteArray = new Uint8Array(chunk.length * 2);
-            for (let i = 0; i < chunk.length; i++) {
-                // Convert each 16-bit integer to two 8-bit values (Little Endian format)
-                const int16Value = chunk[i];
-                byteArray[i * 2] = int16Value & 0xFF; // Low byte
-                byteArray[i * 2 + 1] = (int16Value >> 8) & 0xFF; // High byte
+            // Loopback mic for testing (optional)
+            // recorder.addPlayChunk(chunk);
+
+            //Send mic PCM16 @ 24kHz to OpenAI (base64-encoded little-endian bytes)
+            if (socket && socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify(
+                    {
+                        "event_id": "event_" + eventId++,
+                        "type": "input_audio_buffer.append",
+                        "audio": pcm16ToBase64(chunk)
+                    }
+                ));
             }
-            // Convert the byte array to a string of characters for base64 encoding
-            const byteString = String.fromCharCode.apply(null, byteArray);
-            // redirect to processing
-      //    recorder.addPlayChunk(bytesToPcm(byteString)) // send mic instead for testing
-            socket.send(JSON.stringify(
-                {
-                    "event_id": "event_" + eventId++,
-                    "type": "input_audio_buffer.append",
-                    "audio": btoa(byteString)
-                }
-            )); // Send raw PCM16 binary data
         }, viseme => avatar.setViseme(viseme)
     )
 

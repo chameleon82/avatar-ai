@@ -76,7 +76,18 @@ class PCM16Audio {
 
     // start recording microphone
     async start() {
-        this.mediaStream = await navigator.mediaDevices.getUserMedia({audio: true});
+        // Avoid browser "voice call" processing which causes pumping/quacking and level drops on loud audio.
+        // Best tested with headphones.
+        const constraints = {
+            audio: {
+                channelCount: 1,
+                echoCancellation: false,
+                noiseSuppression: false,
+                autoGainControl: false,
+            },
+        };
+
+        this.mediaStream = await navigator.mediaDevices.getUserMedia(constraints);
         const audioTrack = this.mediaStream.getAudioTracks()[0];
         const settings = audioTrack.getSettings();
         this.inputSampleRate = settings.sampleRate || 48000; // Default to 48000 if not available
