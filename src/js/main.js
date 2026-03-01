@@ -1,7 +1,7 @@
 import {Avatar} from './avatar/avatar.js';
 import {createOutputTracker} from './avatar/visemes.js';
-import {CameraStreamer} from './camera.js';
-import {PCM16Audio} from './pcm16Audio.js';
+import {CameraStreamer} from './camera/cameraStreamer.js';
+import {PCM16Audio} from './audio/pcm16Audio.js';
 
 let avatar = new Avatar("./src/assets/avatar-w.glb");
 // let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
