@@ -1,4 +1,4 @@
-class Avatar {
+export class Avatar {
 
     currentViseme = "sil"
     eyeBlinkProgress = 0;

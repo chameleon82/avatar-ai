@@ -1,4 +1,4 @@
-class PCM16Audio {
+export class PCM16Audio {
     static bytesToPcm(binaryData) {
         // Convert raw binary string (little-endian PCM16) -> Int16Array
         const sampleCount = binaryData.length / 2;
@@ -110,11 +110,8 @@ class PCM16Audio {
 
         const source = this.micAudioContext.createMediaStreamSource(this.mediaStream);
 
-        const pathWithoutScriptName = document
-            .querySelector('script[src$="pcm16Audio.js"]')
-            ?.src.replace(/\/[^\/]+$/, '/') || '';
-
-        await this.micAudioContext.audioWorklet.addModule(pathWithoutScriptName + '/pcmProcessor.js');
+        const workletUrl = new URL('./pcmProcessor.js', import.meta.url);
+        await this.micAudioContext.audioWorklet.addModule(workletUrl);
         this.audioWorkletNode = new AudioWorkletNode(this.micAudioContext, 'pcm-processor');
         this.audioWorkletNode.port.onmessage = (event) => {
             const pcm16Data = new Int16Array(event.data);

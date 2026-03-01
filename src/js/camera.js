@@ -1,4 +1,4 @@
-class CameraStreamer {
+export class CameraStreamer {
     constructor({
                     width = 64,
                     height = 64,

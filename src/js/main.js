@@ -1,5 +1,7 @@
-// Extracted from index.html
-// Depends on globals provided by: three.js, pcm16Audio.js, avatar.js, camera.js
+import {Avatar} from './avatar/avatar.js';
+import {createOutputTracker} from './avatar/visemes.js';
+import {CameraStreamer} from './camera.js';
+import {PCM16Audio} from './pcm16Audio.js';
 
 let avatar = new Avatar("./src/assets/avatar-w.glb");
 // let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
@@ -536,7 +538,7 @@ const recorder = new PCM16Audio(
 // All viseme tracking logic and parameters live in visemes.js.
 const outputAnalyser = recorder.createOutputAnalyser();
 
-const outputVisemeTracker = Visemes.createOutputTracker({
+const outputVisemeTracker = createOutputTracker({
     analyser: outputAnalyser,
     setViseme: (v) => {
         avatar.setViseme(v);
