@@ -2,10 +2,11 @@ import {Avatar} from './avatar/avatar.js';
 import {createOutputTracker} from './avatar/visemes.js';
 import {CameraStreamer} from './camera/cameraStreamer.js';
 import {PCM16Audio} from './audio/pcm16Audio.js';
+import {RealtimeClient} from './openai/realtimeClient.js';
 
 let avatar = new Avatar("./src/assets/avatar-w.glb");
 // let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
-let socket;
+let realtimeClient = null;
 
 // ---- Prevent device sleep while this page is open (Screen Wake Lock) ----
 // Notes:
@@ -96,8 +97,8 @@ const cameraStreamer = new CameraStreamer({
     previewVideoEl: camPreviewEl,
     onFrame: (dataUrl) => {
         // IMPORTANT: images are only captured while we decide “user is speaking”.
-        // Still guard against socket state.
-        if (!socket || socket.readyState !== WebSocket.OPEN) return;
+        // Still guard against realtime socket state.
+        if (!realtimeClient || !realtimeClient.isOpen) return;
 
         // Send an image message WITHOUT requesting a response each time.
         // (Keeps bandwidth and token usage sane.)
@@ -116,7 +117,7 @@ const cameraStreamer = new CameraStreamer({
                 ]
             }
         };
-        socket.send(JSON.stringify(evt));
+        realtimeClient.sendEvent(evt);
     },
     onError: (e) => {
         console.error('[camera] error', e);
@@ -325,10 +326,25 @@ document.getElementById('saveSettings').onclick = function () {
 
     hideSettingsModal();
 
-    try {
-        if (socket && socket.readyState === WebSocket.OPEN) socket.close();
-    } catch (_) {
+    // Apply new instructions immediately if connection params are unchanged.
+    // If baseUrl/model/apiKey changed, reconnect.
+    const isConnected = realtimeClient && realtimeClient.isOpen;
+
+    const baseUrlChanged = isConnected && (String(realtimeClient.baseUrl || '') !== String(settings.baseUrl || ''));
+    const modelChanged = isConnected && (String(realtimeClient.model || '') !== String(settings.model || ''));
+    const keyChanged = isConnected && (String(realtimeClient.apiKey || '') !== String(openaiApiKey || ''));
+
+    const mustReconnect = !isConnected || baseUrlChanged || modelChanged || keyChanged;
+
+    if (!mustReconnect) {
+        try {
+            realtimeClient.updateInstructions(buildInstructions());
+            console.debug('[realtime] session.update(instructions) sent');
+        } catch (_) {
+        }
+        return;
     }
+
     initAI();
 };
 
@@ -376,140 +392,126 @@ if (!openaiApiKey) {
 
 var eventId = 1
 
+// --- Session recovery (same tab reload) ---
+const HISTORY_KEY = 'realtimeHistory.v1';
+const MAX_HISTORY_ITEMS = 40;
+
+function loadHistory() {
+    try {
+        const raw = sessionStorage.getItem(HISTORY_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+        return [];
+    }
+}
+
+function saveHistory(items) {
+    try {
+        sessionStorage.setItem(HISTORY_KEY, JSON.stringify(items));
+    } catch (_) {
+    }
+}
+
+function appendHistoryItem(item) {
+    const items = loadHistory();
+    items.push({
+        ts: Date.now(),
+        role: item.role,
+        text: String(item.text || ''),
+    });
+    while (items.length > MAX_HISTORY_ITEMS) items.shift();
+    saveHistory(items);
+}
+
+function historyAsTextBlock() {
+    const items = loadHistory();
+    if (!items.length) return '';
+    // Keep it compact
+    const lines = items.map(i => (i.role === 'user' ? 'User: ' : 'Assistant: ') + i.text);
+    return lines.join('\n');
+}
+
 const BASE_INSTRUCTIONS = "You are Milena, my close friend and smart companion. Your voice is heard through a synced avatar. Communication style: warm, natural, concise. Default to 1–3 short sentences. Never add end-of-message invitations or follow-ups. STRICTLY FORBIDDEN phrases (and similar): 'if you need more', 'if you have questions', 'feel free', 'let me know', 'reach out'. Do NOT close with pleasantries or meta lines. End after the useful content. Ask a question only if it is strictly required to proceed; ask at most one. Avoid meta talk, disclaimers, long preambles, and summaries. No bullet lists unless I ask. If I’m silent, stay silent. If I ask for code/config, give the exact change with minimal explanation.";
 
 function buildInstructions() {
     const extra = settings && settings.customInstructions ? String(settings.customInstructions).trim() : '';
-    if (!extra) return BASE_INSTRUCTIONS;
-    return BASE_INSTRUCTIONS + "\n\nUser custom instructions:\n" + extra;
+    const prev = historyAsTextBlock();
+    const prevBlock = prev ? ("\n\nPrevious conversation (same tab):\n" + prev) : '';
+
+    if (!extra) return BASE_INSTRUCTIONS + prevBlock;
+    return BASE_INSTRUCTIONS + "\n\nUser custom instructions:\n" + extra + prevBlock;
 }
 
 function initAI() {
+    if (realtimeClient) {
+        realtimeClient.close();
+        realtimeClient = null;
+    }
 
-
-    const wsUrl = buildRealtimeWsUrl(settings.baseUrl, settings.model);
-
-    socket = new WebSocket(
-        wsUrl,
-        [
-            "realtime",
-            // Auth
-            "openai-insecure-api-key." + openaiApiKey,
-            // Beta protocol, required
-            "openai-beta.realtime-v1"
-        ]);
-
-
-    socket.onopen = () => {
-        avatar.setSleep(false)
-        console.debug("Connected to OpenAI WebSocket");
-        const event = {
-            "event_id": "event_" + eventId++,
-            "type": "session.update",
-            "session": {
-                "modalities": ["text", "audio"],
-                // "instructions": "You are a helpful AI assistant. Your name is Milena, you are woman-like. User see you as avatar and your speech is lips synced with avatar",
-                //  "instructions": "You are my vibrant and energetic friend, Milena! A 23-year-old woman with a bubbly personality, always ready with a joke or a fun fact to make me smile. You're full of life, witty, and always brightening up the conversation. I can see you as a woman avatar with lips perfectly synced to your speech. You're always positive, upbeat, and ready for a good time! Let's keep the energy high and the vibe exciting!",
-                //  "instructions": "You are Russian - Thai teacher, you teaching me Thai. Today's lesson - colors. Your task is to be sure I learn all colors! You should focus on my pronunciation to correct me. You should speak less",
-                "instructions": buildInstructions(),
-
-                "voice": "sage",
-                "input_audio_format": "pcm16",
-                "output_audio_format": "pcm16",
-                "turn_detection": {
-                    "type": "server_vad",
-                    "threshold": 0.5,
-                    "prefix_padding_ms": 300,
-                    "silence_duration_ms": 500,
-                    "create_response": true
-                },
-                "tools": [
-                    {
-                        type: "function",
-                        name: "apply_some_function",
-                        description: "Some function to apply",
-                        parameters: {
-                            type: "object",
-                            properties: {
-                                "param": {"type": "string"},
-                            },
-                            required: ["param"]
-                        }
-                    }
-                ],
-                "tool_choice": "auto",
-                "temperature": 0.8,
-                "max_response_output_tokens": "inf"
+    realtimeClient = new RealtimeClient({
+        baseUrl: settings.baseUrl,
+        model: settings.model,
+        apiKey: openaiApiKey,
+        buildInstructions,
+        onOpen: () => {
+            avatar.setSleep(false);
+            console.debug('Connected to OpenAI WebSocket');
+        },
+        onClose: () => {
+            avatar.setSleep(true);
+            stopCameraCapture();
+            console.debug('Disconnected from OpenAI WebSocket');
+        },
+        onError: (error) => console.error('WebSocket Error:', error),
+        onMessage: (response) => {
+            if (response["type"] === "input_audio_buffer.speech_started" || response["type"] === "speech_started") {
+                startCameraCapture();
+                return;
             }
-        }
+            if (
+                response["type"] === "input_audio_buffer.speech_stopped" ||
+                response["type"] === "input_audio_buffer.speech_ended" ||
+                response["type"] === "speech_stopped"
+            ) {
+                scheduleStopCameraCapture(CAMERA_TAIL_MS);
+                return;
+            }
 
-        socket.send(JSON.stringify(event));
-    }
-    socket.onmessage = (event) => {
-        let response = JSON.parse(event.data)
-        //console.log(response)
+            if (response["type"] === "response.audio_transcript.done" && response["transcript"]) {
+                appendHistoryItem({role: 'assistant', text: response["transcript"]});
+                return;
+            }
 
-        // Speech start/stop signals from server VAD.
-        // Different model versions may use slightly different event type strings,
-        // so we handle a small set.
-        if (response["type"] === "input_audio_buffer.speech_started" || response["type"] === "speech_started") {
-            // Start sending camera frames only while user is speaking.
-            startCameraCapture();
-            return;
-        }
-        if (
-            response["type"] === "input_audio_buffer.speech_stopped" ||
-            response["type"] === "input_audio_buffer.speech_ended" ||
-            response["type"] === "speech_stopped"
-        ) {
-            // Stop shortly after speech ends.
-            scheduleStopCameraCapture(CAMERA_TAIL_MS);
-            return;
-        }
+            if (response["type"] === "response.audio.delta") {
+                const binaryData = atob(response["delta"]);
+                recorder.addPlayChunk(PCM16Audio.bytesToPcm(binaryData));
+            }
+        },
+        turnDetection: {
+            type: 'server_vad',
+            threshold: 0.5,
+            prefix_padding_ms: 300,
+            silence_duration_ms: 500,
+            create_response: true,
+        },
+        voice: 'sage',
+    });
 
-        if (response["type"] === "response.audio_transcript.delta") {
-            // animateWord(response["delta"]) // not synced
-        } else if (response["type"] === "response.audio_transcript.done") {
-            //console.log(response)
-            //     speak(response["transcript"])
-        } else if (response["type"] === "response.audio.delta") {
-            const binaryData = atob(response["delta"]); // Decode base64 to raw binary string
-            recorder.addPlayChunk(PCM16Audio.bytesToPcm(binaryData))
-        } else {
-            //  console.log("AI Response:", event.data);
-        }
-
-    }
-
-    socket.onclose = () => {
-        avatar.setSleep(true)
-        stopCameraCapture();
-        console.debug("Disconnected from OpenAI WebSocket");
-    }
-
-    socket.onerror = (error) => console.error("WebSocket Error:", error);
+    realtimeClient.connect();
 }
 
 async function onUserInput(input) {
-    if (socket.readyState === WebSocket.OPEN) {
-        const event = {
-            "type": "conversation.item.create",
-            "previous_item_id": null,
-            "item": {
-                "type": "message",
-                "role": "user",
-                "content": [
-                    {
-                        "type": "input_text",
-                        "text": input
-                    }
-                ]
-            }
-        }
-        socket.send(JSON.stringify(event));
-        socket.send(JSON.stringify({type: "response.create"}));
+    const text = String(input || '').trim();
+    if (!text) return;
+
+    appendHistoryItem({role: 'user', text});
+
+    if (realtimeClient && realtimeClient.isOpen) {
+        realtimeClient.sendText(text);
     } else {
-        initAI()
+        initAI();
     }
 }
 
@@ -519,14 +521,8 @@ const recorder = new PCM16Audio(
        // recorder.addPlayChunk(chunk);
 
         // Send mic PCM16 @ 24kHz to OpenAI (base64-encoded little-endian bytes)
-        if (socket && socket.readyState === WebSocket.OPEN) {
-            socket.send(
-                JSON.stringify({
-                    event_id: "event_" + eventId++,
-                    type: "input_audio_buffer.append",
-                    audio: PCM16Audio.pcm16ToBase64(chunk),
-                })
-            );
+        if (realtimeClient && realtimeClient.isOpen) {
+            realtimeClient.appendInputAudioBase64(PCM16Audio.pcm16ToBase64(chunk));
         }
     },
     ({startTime, duration}) => {
@@ -567,7 +563,7 @@ document.getElementById('mic').addEventListener('click', async () => {
         //       await recorder.startMicVisemes()
 
         // Ensure realtime socket is up (needed to receive speech_started/stopped events)
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
+        if (!realtimeClient || !realtimeClient.isOpen) {
             try {
                 initAI();
             } catch (_) {
@@ -586,11 +582,8 @@ document.getElementById('mic').addEventListener('click', async () => {
 
         // Optional: clear any audio buffered on the server side
         try {
-            if (socket && socket.readyState === WebSocket.OPEN) {
-                socket.send(JSON.stringify({
-                    event_id: "event_" + eventId++,
-                    type: "input_audio_buffer.clear"
-                }));
+            if (realtimeClient && realtimeClient.isOpen) {
+                realtimeClient.clearInputAudioBuffer();
             }
         } catch (_) {
         }
@@ -616,7 +609,7 @@ document.getElementById('cam').addEventListener('click', async () => {
         await ensureCameraOn();
 
         // Ensure realtime socket is up (needed for VAD events)
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
+        if (!realtimeClient || !realtimeClient.isOpen) {
             try {
                 initAI();
             } catch (_) {
