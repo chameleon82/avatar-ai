@@ -82,7 +82,7 @@ class PCM16Audio {
             audio: {
                 channelCount: 1,
                 echoCancellation: false,
-                noiseSuppression: false,
+                noiseSuppression: true,
                 autoGainControl: false,
             },
         };
