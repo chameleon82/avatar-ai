@@ -182,13 +182,23 @@ class Avatar {
                 const index = this.wolfAvatar.morphTargetDictionary[visemeKey];
                 if (index !== targetIndex && visemeKey.startsWith("viseme_")) {
                     if (this.wolfAvatar.morphTargetInfluences[index] > 0) {
-                        this.wolfAvatar.morphTargetInfluences[index] = Math.max(0, this.wolfAvatar.morphTargetInfluences[index] - 0.1); // Fade-out
+                        // Slightly faster fade-out makes articulation crisper.
+                        this.wolfAvatar.morphTargetInfluences[index] = Math.max(
+                            0,
+                            this.wolfAvatar.morphTargetInfluences[index] - 0.15
+                        );
                     }
                 }
             });
             if (targetIndex !== undefined) {
+                const vowels = new Set(['aa', 'O', 'E', 'I', 'U']);
+                const step = vowels.has(this.currentViseme) ? 0.20 : 0.10;
+
                 if (this.wolfAvatar.morphTargetInfluences[targetIndex] < 1) {
-                    this.wolfAvatar.morphTargetInfluences[targetIndex] = Math.min(1, this.wolfAvatar.morphTargetInfluences[targetIndex] + 0.1); // Fade-in
+                    this.wolfAvatar.morphTargetInfluences[targetIndex] = Math.min(
+                        1,
+                        this.wolfAvatar.morphTargetInfluences[targetIndex] + step
+                    );
                 }
             }
         }

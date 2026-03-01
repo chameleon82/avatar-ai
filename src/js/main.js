@@ -514,7 +514,7 @@ async function onUserInput(input) {
 const recorder = new PCM16Audio(
     chunk => {
         // Loopback mic for testing (optional)
-       //  recorder.addPlayChunk(chunk);
+       // recorder.addPlayChunk(chunk);
 
         // Send mic PCM16 @ 24kHz to OpenAI (base64-encoded little-endian bytes)
         if (socket && socket.readyState === WebSocket.OPEN) {
@@ -538,7 +538,10 @@ const outputAnalyser = recorder.createOutputAnalyser();
 
 const outputVisemeTracker = Visemes.createOutputTracker({
     analyser: outputAnalyser,
-    setViseme: (v) => avatar.setViseme(v),
+    setViseme: (v) => {
+        avatar.setViseme(v);
+    },
+    debug: true,
 });
 
 function startOutputVisemes({startTime, duration}) {
