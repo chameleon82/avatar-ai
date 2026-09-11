@@ -531,6 +531,17 @@ function initAI() {
                 console.error('[realtime] server error:', response.error || response);
                 return;
             }
+            if (response["type"] === 'response.function_call_arguments.done' && response.name === 'set_avatar_motion') {
+                try {
+                    const motion = JSON.parse(response.arguments || '{}');
+                    avatar.setMotion(motion);
+                    realtimeClient.sendFunctionOutput(response.call_id, 'Avatar movement applied.');
+                } catch (error) {
+                    console.warn('[avatar] invalid movement cue', error);
+                    realtimeClient.sendFunctionOutput(response.call_id, 'Movement cue ignored because it was invalid.');
+                }
+                return;
+            }
             if (response["type"] === "input_audio_buffer.speech_started" || response["type"] === "speech_started") {
                 startCameraCapture();
                 return;

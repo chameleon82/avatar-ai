@@ -8,6 +8,11 @@ export class Avatar {
     blinkCooldown = 5000;
     isSleep = true
     mixer;
+    motionTarget = {headYaw: 0, headPitch: 0, headRoll: 0, eyeYaw: 0, eyePitch: 0};
+    motion = {headYaw: 0, headPitch: 0, headRoll: 0, eyeYaw: 0, eyePitch: 0};
+    motionBase = new Map();
+    motionLastUpdate = 0;
+    motionTime = Math.random() * 10;
 
     constructor(modelUrl) {
 
@@ -84,6 +89,7 @@ export class Avatar {
                         clz.wolfAvatar.morphTargetInfluences[clz.wolfAvatar.morphTargetDictionary.mouthSmile] = 0.3
                     }
                 });
+                clz.captureMotionBases();
                 // Avatar files can use different local origins and scales. Normalize their
                 // feet, horizontal center, and height so every selection uses the same frame.
                 const bounds = new THREE.Box3().setFromObject(model);
@@ -154,8 +160,57 @@ export class Avatar {
         // update animations
         if (clz.mixer) clz.mixer.update(clz.clock.getDelta());
         this.animateMouthSmoothly();
-        this.animateEyes()
+        this.animateEyes();
+        this.animateMotion();
         this.renderer.render(this.scene, this.camera);
+    }
+
+    captureMotionBases() {
+        for (const node of [this.head, this.leftEye, this.rightEye]) {
+            if (node) this.motionBase.set(node, node.rotation.clone());
+        }
+    }
+
+    // Apply small, bounded AI cues on top of the current animation. Values are degrees.
+    setMotion({headYaw = 0, headPitch = 0, headRoll = 0, eyeYaw = 0, eyePitch = 0} = {}) {
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
+        this.motionTarget = {
+            headYaw: THREE.MathUtils.degToRad(clamp(headYaw, -18, 18)),
+            headPitch: THREE.MathUtils.degToRad(clamp(headPitch, -12, 12)),
+            headRoll: THREE.MathUtils.degToRad(clamp(headRoll, -10, 10)),
+            eyeYaw: THREE.MathUtils.degToRad(clamp(eyeYaw, -24, 24)),
+            eyePitch: THREE.MathUtils.degToRad(clamp(eyePitch, -14, 14)),
+        };
+        this.motionLastUpdate = performance.now();
+    }
+
+    animateMotion() {
+        const now = performance.now();
+        const dt = Math.min(0.1, Math.max(0.001, (now - (this.motionFrameTime || now)) / 1000));
+        this.motionFrameTime = now;
+        this.motionTime += dt;
+        const idleAmount = now - this.motionLastUpdate > 3500 ? 1 : 0;
+        const idle = {
+            headYaw: Math.sin(this.motionTime * 0.45) * 0.035 * idleAmount,
+            headPitch: Math.sin(this.motionTime * 0.31) * 0.018 * idleAmount,
+            headRoll: Math.sin(this.motionTime * 0.37) * 0.012 * idleAmount,
+            eyeYaw: Math.sin(this.motionTime * 0.70) * 0.045 * idleAmount,
+            eyePitch: Math.sin(this.motionTime * 0.53) * 0.025 * idleAmount,
+        };
+        const blend = 1 - Math.exp(-dt * 5);
+        for (const key of Object.keys(this.motion)) {
+            const target = idleAmount ? idle[key] : this.motionTarget[key];
+            this.motion[key] += (target - this.motion[key]) * blend;
+        }
+
+        const applyRotation = (node, offsets) => {
+            const base = this.motionBase.get(node);
+            if (!node || !base) return;
+            node.rotation.set(base.x + offsets.pitch, base.y + offsets.yaw, base.z + offsets.roll);
+        };
+        applyRotation(this.head, {pitch: this.motion.headPitch, yaw: this.motion.headYaw, roll: this.motion.headRoll});
+        applyRotation(this.leftEye, {pitch: this.motion.eyePitch, yaw: this.motion.eyeYaw, roll: 0});
+        applyRotation(this.rightEye, {pitch: this.motion.eyePitch, yaw: this.motion.eyeYaw, roll: 0});
     }
 
     // blink eyes, or close if disconected

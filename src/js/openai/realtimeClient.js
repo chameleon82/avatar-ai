@@ -7,6 +7,7 @@ export class RealtimeClient {
         apiKey,
         buildInstructions,
         onMessage,
+        onMotion,
         onOpen,
         onClose,
         onError,
@@ -20,6 +21,7 @@ export class RealtimeClient {
         this.buildInstructions = buildInstructions;
 
         this.onMessage = onMessage;
+        this.onMotion = onMotion;
         this.onOpen = onOpen;
         this.onClose = onClose;
         this.onError = onError;
@@ -93,6 +95,23 @@ export class RealtimeClient {
                             },
                         },
                         tool_choice: 'auto',
+                        tools: [{
+                            type: 'function',
+                            name: 'set_avatar_motion',
+                            description: 'Move the avatar head and eyes to convey attention and emotion. Call sparingly, usually once per response or when the conversational emotion changes.',
+                            parameters: {
+                                type: 'object',
+                                properties: {
+                                    headYaw: {type: 'number', description: 'Head left/right in degrees, negative is left, range -18 to 18.'},
+                                    headPitch: {type: 'number', description: 'Head up/down in degrees, negative is down, range -12 to 12.'},
+                                    headRoll: {type: 'number', description: 'Head tilt in degrees, range -10 to 10.'},
+                                    eyeYaw: {type: 'number', description: 'Eye gaze left/right in degrees, range -24 to 24.'},
+                                    eyePitch: {type: 'number', description: 'Eye gaze up/down in degrees, range -14 to 14.'},
+                                },
+                                required: ['headYaw', 'headPitch', 'headRoll', 'eyeYaw', 'eyePitch'],
+                                additionalProperties: false,
+                            },
+                        }],
                         max_output_tokens: 'inf',
                     },
                 };
@@ -161,6 +180,23 @@ export class RealtimeClient {
         this.updateSession({instructions});
     }
 
+
+    sendFunctionOutput(callId, output = 'ok') {
+        if (!this.isOpen || !callId) return;
+        this.sendEvent({
+            event_id: this._nextEventId(),
+            type: 'conversation.item.create',
+            item: {
+                type: 'function_call_output',
+                call_id: callId,
+                output: typeof output === 'string' ? output : JSON.stringify(output),
+            },
+        });
+        this.sendEvent({
+            event_id: this._nextEventId(),
+            type: 'response.create',
+        });
+    }
 
     appendInputAudioBase64(audioBase64) {
         this.sendEvent({
