@@ -46,8 +46,8 @@ export class PCM16Audio {
         });
         this.isPlaying = false;
         this.audioQueue = [];
-
-        // Expose a stable output node so callers can attach their own analyser/processing.
+        this.playbackSources = new Set();
+        this.playbackGeneration = 0;
         this.outputGain = this.playAudioContext.createGain();
         this.outputGain.gain.value = 1.0;
         this.outputGain.connect(this.playAudioContext.destination);
@@ -177,9 +177,21 @@ export class PCM16Audio {
         if (!this.isPlaying) this._playNextChunk();
     }
 
+    stopPlayback() {
+        this.audioQueue = [];
+        this.playbackGeneration += 1;
+        for (const source of this.playbackSources) {
+            try { source.stop(); } catch (_) {
+            }
+        }
+        this.playbackSources.clear();
+        this.isPlaying = false;
+    }
+
     _playNextChunk() {
         if (this.audioQueue.length === 0) return;
         this.isPlaying = true;
+        const generation = this.playbackGeneration;
 
         const pcm16Data = this.audioQueue.shift();
 
@@ -193,6 +205,7 @@ export class PCM16Audio {
         const bufferSource = this.playAudioContext.createBufferSource();
         bufferSource.buffer = audioBuffer;
         bufferSource.connect(this.outputGain);
+        this.playbackSources.add(bufferSource);
 
         const startTime = this.playAudioContext.currentTime;
         bufferSource.start(startTime);
@@ -211,7 +224,9 @@ export class PCM16Audio {
 
         bufferSource.onended = () => {
             bufferSource.disconnect();
+            this.playbackSources.delete(bufferSource);
 
+            if (generation !== this.playbackGeneration) return;
             if (this.audioQueue.length === 0) {
                 this.isPlaying = false;
             } else {

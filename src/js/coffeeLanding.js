@@ -9,12 +9,46 @@ const AVATARS = {
     'avatar-m': {model: './src/assets/avatar-m.glb', voice: 'echo', name: 'Marcus', sex: 'male'},
 };
 const MENU = [
-    {id: 'espresso', name: 'Espresso', description: 'Bold, short and silky', price: 3.20, icon: '☕'},
-    {id: 'cappuccino', name: 'Cappuccino', description: 'Velvety milk and cocoa', price: 4.80, icon: '◒'},
-    {id: 'latte', name: 'Vanilla latte', description: 'Sweet vanilla, soft foam', price: 5.40, icon: '🥛'},
-    {id: 'cold-brew', name: 'Cold brew', description: 'Slow-steeped and bright', price: 4.60, icon: '🧊'},
-    {id: 'matcha', name: 'Iced matcha', description: 'Earthy ceremonial green tea', price: 5.20, icon: '🍵'},
-    {id: 'croissant', name: 'Butter croissant', description: 'Warm, flaky and golden', price: 3.90, icon: '🥐'},
+    {id: 'espresso', name: 'Espresso', description: 'Bold, short and silky', price: 3.20, calories: 5, icon: '☕'},
+    {id: 'double-espresso', name: 'Double espresso', description: 'Twice the rich coffee intensity', price: 4.10, calories: 10, icon: '☕'},
+    {id: 'americano', name: 'Americano', description: 'Espresso softened with hot water', price: 3.60, calories: 10, icon: '☕'},
+    {id: 'cortado', name: 'Cortado', description: 'Balanced espresso and warm milk', price: 4.30, calories: 70, icon: '◐'},
+    {id: 'macchiato', name: 'Macchiato', description: 'Espresso kissed with foam', price: 4.20, calories: 35, icon: '☕'},
+    {id: 'cappuccino', name: 'Cappuccino', description: 'Velvety milk and cocoa', price: 4.80, calories: 120, icon: '◒'},
+    {id: 'flat-white', name: 'Flat white', description: 'Silky microfoam and espresso', price: 5.10, calories: 140, icon: '🥛'},
+    {id: 'latte', name: 'Vanilla latte', description: 'Sweet vanilla, soft foam', price: 5.40, calories: 210, icon: '🥛'},
+    {id: 'caramel-latte', name: 'Caramel latte', description: 'Espresso, caramel and steamed milk', price: 5.80, calories: 260, icon: '🥛'},
+    {id: 'mocha', name: 'Mocha', description: 'Chocolate, espresso and milk', price: 5.90, calories: 290, icon: '🍫'},
+    {id: 'white-mocha', name: 'White mocha', description: 'Creamy white chocolate espresso', price: 6.10, calories: 320, icon: '🍫'},
+    {id: 'chai-latte', name: 'Chai latte', description: 'Spiced tea with creamy milk', price: 5.20, calories: 190, icon: '🫖'},
+    {id: 'hot-chocolate', name: 'Hot chocolate', description: 'Rich cocoa with soft cream', price: 4.90, calories: 240, icon: '🍫'},
+    {id: 'matcha', name: 'Iced matcha', description: 'Earthy ceremonial green tea', price: 5.20, calories: 120, icon: '🍵'},
+    {id: 'matcha-latte', name: 'Matcha latte', description: 'Ceremonial matcha with oat milk', price: 5.80, calories: 180, icon: '🍵'},
+    {id: 'iced-americano', name: 'Iced americano', description: 'Chilled espresso over ice', price: 4.00, calories: 15, icon: '🧊'},
+    {id: 'cold-brew', name: 'Cold brew', description: 'Slow-steeped and bright', price: 4.60, calories: 20, icon: '🧊'},
+    {id: 'nitro-cold-brew', name: 'Nitro cold brew', description: 'Silky, nitrogen-infused cold brew', price: 5.40, calories: 25, icon: '🧊'},
+    {id: 'iced-latte', name: 'Iced latte', description: 'Chilled espresso and milk', price: 5.20, calories: 150, icon: '🥤'},
+    {id: 'iced-mocha', name: 'Iced mocha', description: 'Chocolate coffee over ice', price: 5.90, calories: 280, icon: '🥤'},
+    {id: 'affogato', name: 'Affogato', description: 'Vanilla gelato drowned in espresso', price: 6.20, calories: 230, icon: '🍨'},
+    {id: 'coffee-frappe', name: 'Coffee frappé', description: 'Blended coffee with cool foam', price: 6.00, calories: 310, icon: '🥤'},
+    {id: 'berry-smoothie', name: 'Berry smoothie', description: 'Bright berries and yogurt', price: 6.40, calories: 220, icon: '🍓'},
+    {id: 'green-smoothie', name: 'Green smoothie', description: 'Apple, spinach and lime', price: 6.50, calories: 180, icon: '🥬'},
+    {id: 'croissant', name: 'Butter croissant', description: 'Warm, flaky and golden', price: 3.90, calories: 260, icon: '🥐'},
+    {id: 'almond-croissant', name: 'Almond croissant', description: 'Flaky pastry with almond cream', price: 4.80, calories: 410, icon: '🥐'},
+    {id: 'chocolate-croissant', name: 'Chocolate croissant', description: 'Buttery pastry with dark chocolate', price: 4.50, calories: 330, icon: '🥐'},
+    {id: 'blueberry-muffin', name: 'Blueberry muffin', description: 'Soft crumb with fresh berries', price: 4.20, calories: 380, icon: '🧁'},
+    {id: 'banana-bread', name: 'Banana bread', description: 'Moist loaf with toasted walnuts', price: 4.30, calories: 340, icon: '🍌'},
+    {id: 'cinnamon-roll', name: 'Cinnamon roll', description: 'Warm swirl with vanilla glaze', price: 4.90, calories: 450, icon: '🍥'},
+    {id: 'lemon-cake', name: 'Lemon cake', description: 'Tender cake with lemon zest', price: 4.60, calories: 360, icon: '🍋'},
+    {id: 'carrot-cake', name: 'Carrot cake', description: 'Spiced cake with cream cheese icing', price: 5.10, calories: 430, icon: '🥕'},
+    {id: 'cheesecake', name: 'Cheesecake slice', description: 'Classic creamy baked cheesecake', price: 5.80, calories: 510, icon: '🍰'},
+    {id: 'granola-yogurt', name: 'Granola yogurt', description: 'Greek yogurt, fruit and granola', price: 5.60, calories: 290, icon: '🥣'},
+    {id: 'avocado-toast', name: 'Avocado toast', description: 'Sourdough with lemon and chili', price: 7.20, calories: 360, icon: '🥑'},
+    {id: 'hummus-toast', name: 'Hummus toast', description: 'Sourdough, hummus and herbs', price: 6.80, calories: 330, icon: '🍞'},
+    {id: 'turkey-sandwich', name: 'Turkey sandwich', description: 'Turkey, greens and mustard', price: 8.50, calories: 420, icon: '🥪'},
+    {id: 'caprese-panini', name: 'Caprese panini', description: 'Mozzarella, tomato and basil', price: 8.20, calories: 460, icon: '🥪'},
+    {id: 'breakfast-wrap', name: 'Breakfast wrap', description: 'Egg, cheese and roasted vegetables', price: 8.90, calories: 520, icon: '🌯'},
+    {id: 'oatmeal', name: 'Warm oatmeal', description: 'Oats, berries and maple', price: 5.90, calories: 310, icon: '🥣'},
 ];
 const SETTINGS_KEY = 'openaiSettings';
 const defaults = {baseUrl: 'https://api.openai.com', model: 'gpt-realtime-mini', avatar: 'avatar-w', apiKey: '', rememberKey: false};
@@ -38,14 +72,26 @@ function option() { return AVATARS[settings.avatar] || AVATARS['avatar-w']; }
 function money(value) { return `$${value.toFixed(2)}`; }
 function menuItem(id) { return MENU.find((item) => item.id === id); }
 function orderTotal() { return order.reduce((total, line) => total + line.quantity * line.item.price, 0); }
+function orderCalories() { return order.reduce((total, line) => total + line.quantity * line.item.calories, 0); }
 function orderCount() { return order.reduce((total, line) => total + line.quantity, 0); }
 function orderSummary() { return order.map((line) => `${line.quantity}× ${line.item.name}`).join(', ') || 'empty'; }
+function highlightMenuItem(id) {
+    const item = menuItem(id);
+    const element = document.querySelector(`[data-menu-id="${CSS.escape(String(id))}"]`);
+    if (!item || !element) return {error: `Unknown menu item: ${id}`};
+    document.querySelectorAll('.menu-item.recommended').forEach((button) => button.classList.remove('recommended'));
+    element.classList.add('recommended');
+    element.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'nearest'});
+    window.setTimeout(() => element.classList.remove('recommended'), 6000);
+    console.info('[coffee menu] barista recommended', item.name);
+    return {status: 'menu item highlighted', item: item.name, itemId: item.id};
+}
 
 function renderMenu() {
     document.getElementById('menuGrid').innerHTML = MENU.map((item) => `
         <button class="menu-item" data-menu-id="${item.id}">
             <span class="menu-icon">${item.icon}</span><h3>${item.name}</h3>
-            <p>${item.description}</p><span class="menu-price">${money(item.price)}</span>
+            <p>${item.description}</p><span class="menu-meta"><span class="menu-calories">${item.calories} kcal</span><span class="menu-price">${money(item.price)}</span></span>
         </button>`).join('');
     document.querySelectorAll('[data-menu-id]').forEach((button) => button.addEventListener('click', () => {
         addToOrder(button.dataset.menuId, 1);
@@ -56,9 +102,10 @@ function renderBasket() {
     const lines = document.getElementById('basketLines');
     document.getElementById('basketCount').textContent = `${orderCount()} item${orderCount() === 1 ? '' : 's'}`;
     document.getElementById('basketTotal').textContent = money(orderTotal());
+    document.getElementById('basketCalories').textContent = `${orderCalories()} kcal`;
     document.getElementById('payButton').disabled = order.length === 0 || paid;
     document.getElementById('nextCustomerButton').hidden = !paid;
-    lines.innerHTML = order.length ? order.map((line) => `<div class="basket-line"><span>${line.item.name}<small> × ${line.quantity}</small></span><strong>${money(line.item.price * line.quantity)}</strong><button class="remove-line" data-remove-id="${line.item.id}" aria-label="Remove ${line.item.name}">×</button></div>`).join('') : '<p class="empty-basket">Your basket is waiting for its first treat.</p>';
+    lines.innerHTML = order.length ? order.map((line) => `<div class="basket-line"><span>${line.item.name}<small> × ${line.quantity} · ${line.item.calories * line.quantity} kcal</small></span><strong>${money(line.item.price * line.quantity)}</strong><button class="remove-line" data-remove-id="${line.item.id}" aria-label="Remove ${line.item.name}">×</button></div>`).join('') : '<p class="empty-basket">Your basket is waiting for its first treat.</p>';
     lines.querySelectorAll('[data-remove-id]').forEach((button) => button.addEventListener('click', () => {
         removeFromOrder(button.dataset.removeId, 1);
         sendUserText(`Remove one ${menuItem(button.dataset.removeId).name} from my order.`);
@@ -73,7 +120,7 @@ function addToOrder(id, quantity = 1) {
     if (line) line.quantity = Math.min(9, line.quantity + amount);
     else order.push({item, quantity: amount});
     renderBasket();
-    return {item: item.name, quantity: amount, order: orderSummary(), total: money(orderTotal())};
+    return {item: item.name, quantity: amount, calories: item.calories * amount, order: orderSummary(), total: money(orderTotal()), totalCalories: `${orderCalories()} kcal`};
 }
 function removeFromOrder(id, quantity = 1) {
     const line = order.find((entry) => entry.item.id === id);
@@ -81,7 +128,7 @@ function removeFromOrder(id, quantity = 1) {
     line.quantity -= Math.max(1, Number(quantity) || 1);
     if (line.quantity <= 0) order = order.filter((entry) => entry !== line);
     renderBasket();
-    return {order: orderSummary(), total: money(orderTotal())};
+    return {order: orderSummary(), total: money(orderTotal()), totalCalories: `${orderCalories()} kcal`};
 }
 function clearOrder() { order = []; renderBasket(); }
 
@@ -111,13 +158,14 @@ function showPayment(callId = null) {
 }
 function closePayment() { document.getElementById('paymentPanel').hidden = true; }
 
-const BASE_INSTRUCTIONS = `You are the friendly barista ${option().name}. This is a coffee shop ordering experience. Speak warmly and briefly, like a real barista. The menu is: ${MENU.map((item) => `${item.id} (${item.name}) ${money(item.price)}`).join('; ')}. When the customer orders a drink or pastry, call add_to_order immediately; do not only repeat the order in speech. Use remove_from_order or clear_order when asked. Always use the exact item id from the menu. Keep the customer informed of the running total after changes. When the customer confirms they are finished, call request_payment; never claim that a real payment was processed. After payment success, thank the customer, give a short pickup estimate, and wait. After payment failure, apologize briefly and offer another attempt. Use set_avatar_motion for welcoming waves, attentive nods, and natural gestures. Never invent menu items or prices. Do not say 'if you need more', 'feel free', or similar closing phrases.`;
+const BASE_INSTRUCTIONS = `You are the friendly barista ${option().name}. This is a coffee shop ordering experience. Speak warmly and briefly, like a real barista. The ONLY products available are the exact items listed below: ${MENU.map((item) => `${item.id} (${item.name}) ${money(item.price)}, ${item.calories} kcal`).join('; ')}. Treat this list as the complete and authoritative inventory. You may recommend, describe, compare, or add ONLY items in this list. Never mention, suggest, recommend, promise, substitute, or invent any product that is not listed, even if the customer asks for it or it is a common cafe item. If the customer asks for an unavailable item, clearly say it is not on today's menu and offer one or two similar alternatives selected only from the listed menu. Before every recommendation, verify that the exact item name and id appear in the menu above, then call recommend_menu_item for every menu item you recommend so the customer can see it highlighted. Call that tool before or while explaining the recommendation; never call it for an unavailable product. When the customer orders a drink or pastry, call add_to_order immediately; do not only repeat the order in speech. Use remove_from_order or clear_order when asked. Always use the exact item id from the menu. Keep the customer informed of the running total and estimated calories after changes. Calories are estimates per serving. When the customer confirms they are finished, call request_payment; never claim that a real payment was processed. After payment success, thank the customer, give a short pickup estimate, and wait. After payment failure, apologize briefly and offer another attempt. Use set_avatar_motion for welcoming waves, attentive nods, and natural gestures. Never invent menu items, calories, or prices. Do not say 'if you need more', 'feel free', or similar closing phrases.`;
 function instructions() { return `${BASE_INSTRUCTIONS.replace(/barista [^\.]+\./, `barista ${option().name}.`)}\nYou are ${option().name}, a ${option().sex} character. Current basket: ${orderSummary()}; total ${money(orderTotal())}.`; }
 
 const coffeeTools = [
     {type: 'function', name: 'add_to_order', description: 'Add one or more exact menu items to the customer basket. Call this when the customer orders something.', parameters: {type: 'object', properties: {itemId: {type: 'string', enum: MENU.map((item) => item.id)}, quantity: {type: 'integer', minimum: 1, maximum: 9}}, required: ['itemId', 'quantity'], additionalProperties: false}},
     {type: 'function', name: 'remove_from_order', description: 'Remove items from the basket when the customer changes their mind.', parameters: {type: 'object', properties: {itemId: {type: 'string', enum: MENU.map((item) => item.id)}, quantity: {type: 'integer', minimum: 1, maximum: 9}}, required: ['itemId', 'quantity'], additionalProperties: false}},
     {type: 'function', name: 'clear_order', description: 'Empty the whole basket when the customer asks to start over.', parameters: {type: 'object', properties: {}, additionalProperties: false}},
+    {type: 'function', name: 'recommend_menu_item', description: 'Highlight an exact available menu item while recommending it. Call once per recommended item before explaining it.', parameters: {type: 'object', properties: {itemId: {type: 'string', enum: MENU.map((item) => item.id)}}, required: ['itemId'], additionalProperties: false}},
     {type: 'function', name: 'request_payment', description: 'Show the simulated QR payment screen after the customer confirms the basket.', parameters: {type: 'object', properties: {}, additionalProperties: false}},
 ];
 
@@ -140,10 +188,15 @@ function parseArguments(raw) {
     try { return JSON.parse(String(raw || '{}').replace(/^```json\s*/i, '').replace(/\s*```$/, '')); }
     catch (_) { return {}; }
 }
-function sendUserText(text) {
+function sendUserText(text, {replaceActiveResponse = true} = {}) {
     const value = String(text || '').trim();
-    if (!value) return;
-    if (realtime?.isOpen) realtime.sendText(value);
+    if (!value || !realtime?.isOpen) return;
+    if (replaceActiveResponse) {
+        realtime.cancelResponse({clearPending: true});
+        recorder?.stopPlayback();
+        console.debug('[coffee realtime] replaced pending barista response with latest customer state');
+    }
+    realtime.sendText(value);
 }
 function setStatus(connected) {
     const status = document.getElementById('baristaStatus');
@@ -157,6 +210,7 @@ function handleFunctionCall(message) {
     if (message.name === 'add_to_order') result = addToOrder(args.itemId, args.quantity);
     else if (message.name === 'remove_from_order') result = removeFromOrder(args.itemId, args.quantity);
     else if (message.name === 'clear_order') { clearOrder(); result = {status: 'basket cleared', total: '$0.00'}; }
+    else if (message.name === 'recommend_menu_item') result = highlightMenuItem(args.itemId);
     else if (message.name === 'request_payment') result = showPayment(message.call_id);
     else return false;
     realtime.sendFunctionOutput(message.call_id, result || {status: 'done'});

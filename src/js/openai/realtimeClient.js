@@ -277,6 +277,15 @@ export class RealtimeClient {
         return true;
     }
 
+    cancelResponse({clearPending = true} = {}) {
+        if (clearPending) this.pendingResponses = [];
+        if (!this.isOpen) return false;
+        if (!this.responseInProgress) return false;
+        this.sendEvent({event_id: this._nextEventId(), type: 'response.cancel'});
+        if (this.debug) console.debug('[realtime] active response cancelled for newer state');
+        return true;
+    }
+
     sendFunctionOutput(callId, output = 'ok', {silent = false} = {}) {
         if (!this.isOpen || !callId) return;
         this.sendEvent({
