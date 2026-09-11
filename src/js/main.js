@@ -559,7 +559,12 @@ async function onUserInput(input) {
 const recorder = new PCM16Audio(
     chunk => {
         // Loopback mic for testing (optional)
-       // recorder.addPlayChunk(chunk);
+        // recorder.addPlayChunk(chunk);
+
+        // Never feed the microphone back to Realtime while the avatar is
+        // speaking. This is a second line of defense for Mac speakers when
+        // browser acoustic echo cancellation is imperfect.
+        if (recorder.isPlaying) return;
 
         // Send mic PCM16 @ 24kHz to OpenAI (base64-encoded little-endian bytes)
         if (realtimeClient && realtimeClient.isOpen) {

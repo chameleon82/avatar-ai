@@ -94,16 +94,17 @@ export class PCM16Audio {
         return analyser;
     }
 
-
     // start recording microphone
     async start() {
-        // Avoid browser "voice call" processing (pumping/quacking)
+        // Let macOS/browser acoustic echo cancellation remove the avatar's speaker
+        // output from the microphone signal. Disabling this makes the Realtime VAD
+        // hear the assistant and can trigger an endless self-reply loop.
         const constraints = {
             audio: {
                 channelCount: 1,
-                echoCancellation: false,
+                echoCancellation: true,
                 noiseSuppression: true,
-                autoGainControl: false,
+                autoGainControl: true,
             },
         };
 
