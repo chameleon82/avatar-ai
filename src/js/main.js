@@ -4,8 +4,14 @@ import {CameraStreamer} from './camera/cameraStreamer.js';
 import {PCM16Audio} from './audio/pcm16Audio.js';
 import {RealtimeClient} from './openai/realtimeClient.js';
 
-let avatar = new Avatar("./src/assets/avatar-w.glb");
-// let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
+const AVATAR_OPTIONS = {
+    'avatar-w': {model: './src/assets/avatar-w.glb', voice: 'sage'},
+    'avatar': {model: './src/assets/avatar.glb', voice: 'alloy'},
+    'avatar-m': {model: './src/assets/avatar-m.glb', voice: 'echo'},
+};
+
+let avatar = new Avatar(AVATAR_OPTIONS['avatar-w'].model);
+// The selected avatar and its voice are configured together in Settings.
 let realtimeClient = null;
 let pendingText = [];
 
@@ -203,13 +209,8 @@ async function init() {
     inputField.addEventListener('keydown', onEnterKey);
 
     document.body.appendChild(avatar.renderer.domElement);
-    avatar.renderer.setSize(window.innerWidth, window.innerHeight);
-    window.addEventListener('resize', () => {
-        avatar.renderer.setSize(window.innerWidth, window.innerHeight);
-        // Update camera aspect ratio and other settings if necessary
-        avatar.camera.aspect = window.innerWidth / window.innerHeight;
-        avatar.camera.updateProjectionMatrix();
-    });
+    resizeAvatarRenderer();
+    window.addEventListener('resize', resizeAvatarRenderer);
 }
 
 
@@ -221,6 +222,7 @@ const SETTINGS_KEY = 'openaiSettings';
 const defaultSettings = {
     baseUrl: 'https://api.openai.com',
     model: 'gpt-realtime-mini',
+    avatar: 'avatar-w',
     rememberKey: false,
     apiKey: '',
     customInstructions: ''
@@ -246,6 +248,42 @@ function clearSavedKey() {
     s.apiKey = '';
     s.rememberKey = false;
     saveSettings(s);
+}
+
+function getAvatarOption(id) {
+    return AVATAR_OPTIONS[id] || AVATAR_OPTIONS['avatar-w'];
+}
+
+function resizeAvatarRenderer() {
+    if (!avatar || !avatar.renderer || !avatar.camera) return;
+    avatar.renderer.setSize(window.innerWidth, window.innerHeight);
+    avatar.camera.aspect = window.innerWidth / window.innerHeight;
+    avatar.camera.updateProjectionMatrix();
+}
+
+function applyAvatarSelection(id) {
+    const option = getAvatarOption(id);
+    const previous = avatar;
+    avatar = new Avatar(option.model);
+
+    // Replace the rendered canvas without leaving the old render loop running.
+    if (previous && previous.renderer) {
+        const oldCanvas = previous.renderer.domElement;
+        if (oldCanvas.parentNode) oldCanvas.parentNode.removeChild(oldCanvas);
+        if (typeof previous.dispose === 'function') previous.dispose();
+    }
+    document.body.appendChild(avatar.renderer.domElement);
+    // A new WebGL canvas starts at 300x150 unless it is explicitly sized.
+    // Keep replacement avatars in the same full-screen viewport as the original.
+    resizeAvatarRenderer();
+}
+
+function selectedAvatarId() {
+    return AVATAR_OPTIONS[settings.avatar] ? settings.avatar : 'avatar-w';
+}
+
+function selectedAvatarVoice() {
+    return getAvatarOption(selectedAvatarId()).voice;
 }
 
 function normalizeBaseUrl(input) {
@@ -278,12 +316,14 @@ function showSettingsModal({force = false} = {}) {
     const modal = document.getElementById('modal');
     const baseUrlInput = document.getElementById('baseUrlInput');
     const modelInput = document.getElementById('modelInput');
+    const avatarInput = document.getElementById('avatarInput');
     const apiKeyInput = document.getElementById('apiKeyInput');
     const rememberKeyEl = document.getElementById('rememberKey');
     const customInstructionsInput = document.getElementById('customInstructionsInput');
 
     baseUrlInput.value = settings.baseUrl || defaultSettings.baseUrl;
     modelInput.value = settings.model || defaultSettings.model;
+    avatarInput.value = selectedAvatarId();
     apiKeyInput.value = openaiApiKey || '';
     rememberKeyEl.checked = !!settings.rememberKey;
     if (customInstructionsInput) customInstructionsInput.value = settings.customInstructions || '';
@@ -300,6 +340,7 @@ function hideSettingsModal() {
 document.getElementById('saveSettings').onclick = function () {
     const baseUrlInput = document.getElementById('baseUrlInput');
     const modelInput = document.getElementById('modelInput');
+    const avatarInput = document.getElementById('avatarInput');
     const apiKeyInput = document.getElementById('apiKeyInput');
     const rememberKeyEl = document.getElementById('rememberKey');
     const customInstructionsInput = document.getElementById('customInstructionsInput');
@@ -307,6 +348,7 @@ document.getElementById('saveSettings').onclick = function () {
     const next = {
         baseUrl: normalizeBaseUrl(baseUrlInput.value),
         model: (modelInput.value || defaultSettings.model).trim(),
+        avatar: avatarInput.value in AVATAR_OPTIONS ? avatarInput.value : defaultSettings.avatar,
         rememberKey: !!rememberKeyEl.checked,
         apiKey: '',
         customInstructions: (customInstructionsInput ? (customInstructionsInput.value || '') : '').trim()
@@ -316,6 +358,7 @@ document.getElementById('saveSettings').onclick = function () {
     openaiApiKey = (apiKeyInput.value || '').trim();
     if (next.rememberKey) next.apiKey = openaiApiKey;
 
+    const avatarChanged = settings.avatar !== next.avatar;
     settings = next;
     saveSettings(settings);
 
@@ -325,17 +368,19 @@ document.getElementById('saveSettings').onclick = function () {
         return;
     }
 
+    if (avatarChanged) applyAvatarSelection(settings.avatar);
     hideSettingsModal();
 
     // Apply new instructions immediately if connection params are unchanged.
-    // If baseUrl/model/apiKey changed, reconnect.
+    // If baseUrl/model/key/avatar changed, reconnect so the voice follows the avatar.
     const isConnected = realtimeClient && realtimeClient.isOpen;
 
     const baseUrlChanged = isConnected && (String(realtimeClient.baseUrl || '') !== String(settings.baseUrl || ''));
     const modelChanged = isConnected && (String(realtimeClient.model || '') !== String(settings.model || ''));
     const keyChanged = isConnected && (String(realtimeClient.apiKey || '') !== String(openaiApiKey || ''));
+    const voiceChanged = isConnected && (String(realtimeClient.voice || '') !== String(selectedAvatarVoice()));
 
-    const mustReconnect = !isConnected || baseUrlChanged || modelChanged || keyChanged;
+    const mustReconnect = !isConnected || baseUrlChanged || modelChanged || keyChanged || avatarChanged || voiceChanged;
 
     if (!mustReconnect) {
         try {
@@ -387,6 +432,7 @@ if (settingsBtn) {
 if (!openaiApiKey) {
     showSettingsModal({force: true});
 } else {
+    if (settings.avatar !== 'avatar-w') applyAvatarSelection(settings.avatar);
     initAI();
 }
 
@@ -530,7 +576,7 @@ function initAI() {
             silence_duration_ms: 500,
             create_response: true,
         },
-        voice: 'sage',
+        voice: selectedAvatarVoice(),
         debug: true,
     });
 
