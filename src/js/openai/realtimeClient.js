@@ -111,6 +111,36 @@ export class RealtimeClient {
                                 required: ['headYaw', 'headPitch', 'headRoll', 'eyeYaw', 'eyePitch'],
                                 additionalProperties: false,
                             },
+                        }, {
+                            type: 'function',
+                            name: 'set_avatar_tracking',
+                            description: 'Read the latest webcam image and silently aim the avatar toward the user face. Use this only for camera tracking, not conversation. Return normalized face coordinates.',
+                            parameters: {
+                                type: 'object',
+                                properties: {
+                                    faceX: {type: 'number', description: 'Face center horizontal position in the unmirrored webcam image: -1 is image left, 0 center, 1 image right. Do not mirror this value.'},
+                                    faceY: {type: 'number', description: 'Face center vertical position in the image: -1 is top, 0 center, 1 bottom.'},
+                                    distanceCm: {type: 'number', description: 'Estimated distance from the MacBook camera in centimeters; use 50 when uncertain.'},
+                                    confidence: {type: 'number', description: 'Confidence from 0 to 1; use 0 when no face is visible.'},
+                                },
+                                required: ['faceX', 'faceY', 'distanceCm', 'confidence'],
+                                additionalProperties: false,
+                            },
+                        }, {
+                            type: 'function',
+                            name: 'set_avatar_expression',
+                            description: 'Set a subtle facial expression and optional gesture for the avatar. Use sparingly and keep intensity natural.',
+                            parameters: {
+                                type: 'object',
+                                properties: {
+                                    emotion: {type: 'string', enum: ['neutral', 'happy', 'sad', 'angry', 'surprised', 'confused']},
+                                    intensity: {type: 'number', description: 'Expression intensity from 0 to 1.'},
+                                    gesture: {type: 'string', enum: ['none', 'nod', 'shake', 'tilt']},
+                                    gestureIntensity: {type: 'number', description: 'Gesture intensity from 0 to 1.'},
+                                },
+                                required: ['emotion', 'intensity', 'gesture', 'gestureIntensity'],
+                                additionalProperties: false,
+                            },
                         }],
                         max_output_tokens: 'inf',
                     },
@@ -181,7 +211,7 @@ export class RealtimeClient {
     }
 
 
-    sendFunctionOutput(callId, output = 'ok') {
+    sendFunctionOutput(callId, output = 'ok', {silent = false} = {}) {
         if (!this.isOpen || !callId) return;
         this.sendEvent({
             event_id: this._nextEventId(),
@@ -195,6 +225,10 @@ export class RealtimeClient {
         this.sendEvent({
             event_id: this._nextEventId(),
             type: 'response.create',
+            ...(silent ? {response: {
+                output_modalities: ['text'],
+                instructions: 'Do not speak. Finish the camera-tracking tool turn silently.',
+            }} : {}),
         });
     }
 

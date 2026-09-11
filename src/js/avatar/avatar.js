@@ -13,6 +13,18 @@ export class Avatar {
     motionBase = new Map();
     motionLastUpdate = 0;
     motionTime = Math.random() * 10;
+    listening = false;
+    nextSaccadeAt = 0;
+    saccade = {yaw: 0, pitch: 0};
+    saccadeTarget = {yaw: 0, pitch: 0};
+    expressionTarget = {emotion: 'neutral', intensity: 0};
+    expression = {emotion: 'neutral', intensity: 0};
+    gestureTarget = {type: 'none', intensity: 0};
+    gesture = {type: 'none', intensity: 0};
+    bodyNodes = {};
+    morphMeshes = [];
+    expressionMorphs = [];
+    breathingTime = Math.random() * 10;
 
     constructor(modelUrl) {
 
@@ -83,6 +95,20 @@ export class Avatar {
                     if (child.name.toLowerCase() === "head") clz.head = child;
                     if (child.name.toLowerCase() === "lefteye") clz.leftEye = child;
                     if (child.name.toLowerCase() === "righteye") clz.rightEye = child;
+                    const nodeName = child.name.toLowerCase();
+                    if (!clz.bodyNodes.neck && /neck/.test(nodeName)) clz.bodyNodes.neck = child;
+                    if (!clz.bodyNodes.spine && /(spine|chest|upper.?body)/.test(nodeName)) clz.bodyNodes.spine = child;
+                    if (!clz.bodyNodes.leftShoulder && /(left|l)_?shoulder/.test(nodeName)) clz.bodyNodes.leftShoulder = child;
+                    if (!clz.bodyNodes.rightShoulder && /(right|r)_?shoulder/.test(nodeName)) clz.bodyNodes.rightShoulder = child;
+                    if (child.morphTargetDictionary && child.morphTargetInfluences) {
+                        clz.morphMeshes.push(child);
+                        for (const name of Object.keys(child.morphTargetDictionary)) {
+                            const lower = name.toLowerCase();
+                            if (!/viseme|mouthsmile/.test(lower) && /smile|happy|joy|sad|frown|angry|brow|eyebrow|surprise|blink/.test(lower)) {
+                                clz.expressionMorphs.push({mesh: child, name, index: child.morphTargetDictionary[name]});
+                            }
+                        }
+                    }
 
                     if (child.name === 'Wolf3D_Avatar') {
                         clz.wolfAvatar = child;
@@ -162,11 +188,13 @@ export class Avatar {
         this.animateMouthSmoothly();
         this.animateEyes();
         this.animateMotion();
+        this.animateExpressions();
+        this.animateBody();
         this.renderer.render(this.scene, this.camera);
     }
 
     captureMotionBases() {
-        for (const node of [this.head, this.leftEye, this.rightEye]) {
+        for (const node of [this.head, this.leftEye, this.rightEye, this.bodyNodes.neck, this.bodyNodes.spine, this.bodyNodes.leftShoulder, this.bodyNodes.rightShoulder]) {
             if (node) this.motionBase.set(node, node.rotation.clone());
         }
     }
@@ -184,11 +212,111 @@ export class Avatar {
         this.motionLastUpdate = performance.now();
     }
 
+    setListening(isListening) {
+        this.listening = !!isListening;
+        if (!this.listening) this.saccadeTarget = {yaw: 0, pitch: 0};
+    }
+
+    // Map a normalized camera face position into a virtual MacBook-camera perspective.
+    // The 50 cm distance is the neutral viewing distance; horizontal/vertical offsets
+    // become smaller, natural head and eye cues rather than a literal screen-space jump.
+    setTracking({faceX = 0, faceY = 0, distanceCm = 50, confidence = 1} = {}) {
+        const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
+        // The webcam image is from the camera's point of view, while avatar yaw
+        // is expressed from the avatar's point of view. Invert both axes so a
+        // person moving left/right in the MacBook image produces the matching
+        // avatar gaze instead of a mirrored reaction.
+        const x = clamp(-faceX, -1, 1);
+        const y = clamp(faceY, -1, 1);
+        const distance = clamp(distanceCm, 25, 150);
+        const certainty = clamp(confidence, 0, 1);
+        const distanceScale = clamp(50 / distance, 0.8, 1.6);
+
+        // Approximate a MacBook webcam: ~60° horizontal and ~45° vertical FOV.
+        // Use a stronger gain than the raw camera angle: the face usually moves
+        // only a small fraction of the cropped frame at normal laptop distance.
+        const horizontalAngle = Math.atan(x * Math.tan(THREE.MathUtils.degToRad(30)));
+        const verticalAngle = Math.atan(y * Math.tan(THREE.MathUtils.degToRad(22.5)));
+        this.setMotion({
+            headYaw: THREE.MathUtils.radToDeg(horizontalAngle) * 0.95 * distanceScale * certainty,
+            // Positive image Y means lower on screen; negative pitch means down.
+            headPitch: -THREE.MathUtils.radToDeg(verticalAngle) * 0.85 * distanceScale * certainty,
+            headRoll: 0,
+            eyeYaw: THREE.MathUtils.radToDeg(horizontalAngle) * 1.45 * distanceScale * certainty,
+            eyePitch: -THREE.MathUtils.radToDeg(verticalAngle) * 1.25 * distanceScale * certainty,
+        });
+    }
+
+    setExpression({emotion = 'neutral', intensity = 0} = {}) {
+        const allowed = new Set(['neutral', 'happy', 'sad', 'angry', 'surprised', 'confused']);
+        this.expressionTarget = {
+            emotion: allowed.has(String(emotion).toLowerCase()) ? String(emotion).toLowerCase() : 'neutral',
+            intensity: Math.max(0, Math.min(1, Number(intensity) || 0)),
+        };
+    }
+
+    setGesture({type = 'none', intensity = 0} = {}) {
+        const allowed = new Set(['none', 'nod', 'shake', 'tilt']);
+        this.gestureTarget = {
+            type: allowed.has(String(type).toLowerCase()) ? String(type).toLowerCase() : 'none',
+            intensity: Math.max(0, Math.min(1, Number(intensity) || 0)),
+        };
+    }
+
+    animateExpressions() {
+        const blend = 0.08;
+        this.expression.intensity += (this.expressionTarget.intensity - this.expression.intensity) * blend;
+        this.expression.emotion = this.expressionTarget.emotion;
+        const keywords = {
+            happy: ['smile', 'happy', 'joy'], sad: ['sad', 'frown'], angry: ['angry', 'frown'],
+            surprised: ['surprise'], confused: ['brow', 'eyebrow'], neutral: []
+        }[this.expression.emotion] || [];
+        for (const entry of this.expressionMorphs) {
+            const matches = keywords.some(keyword => entry.name.toLowerCase().includes(keyword));
+            const target = matches ? this.expression.intensity : 0;
+            entry.mesh.morphTargetInfluences[entry.index] += (target - entry.mesh.morphTargetInfluences[entry.index]) * blend;
+        }
+    }
+
+    animateBody() {
+        const now = performance.now();
+        const dt = Math.min(0.1, Math.max(0.001, (now - (this.bodyFrameTime || now)) / 1000));
+        this.bodyFrameTime = now;
+        this.breathingTime += dt;
+        const baseSpine = this.motionBase.get(this.bodyNodes.spine);
+        if (this.bodyNodes.spine && baseSpine) {
+            this.bodyNodes.spine.rotation.x = baseSpine.x + Math.sin(this.breathingTime * 1.7) * 0.008;
+        }
+        const blend = 1 - Math.exp(-dt * 6);
+        this.gesture.intensity += (this.gestureTarget.intensity - this.gesture.intensity) * blend;
+        this.gesture.type = this.gestureTarget.type;
+        const baseNeck = this.motionBase.get(this.bodyNodes.neck);
+        if (this.bodyNodes.neck && baseNeck) {
+            const nod = this.gesture.type === 'nod' ? Math.sin(this.motionTime * 3) * 0.06 * this.gesture.intensity : 0;
+            const shake = this.gesture.type === 'shake' ? Math.sin(this.motionTime * 3) * 0.08 * this.gesture.intensity : 0;
+            const tilt = this.gesture.type === 'tilt' ? 0.12 * this.gesture.intensity : 0;
+            this.bodyNodes.neck.rotation.set(baseNeck.x + nod, baseNeck.y + shake, baseNeck.z + tilt);
+        }
+    }
+
     animateMotion() {
         const now = performance.now();
         const dt = Math.min(0.1, Math.max(0.001, (now - (this.motionFrameTime || now)) / 1000));
         this.motionFrameTime = now;
         this.motionTime += dt;
+
+        // Irregular, low-amplitude eye movements make the avatar feel attentive.
+        if (now >= this.nextSaccadeAt) {
+            this.saccadeTarget = {
+                yaw: (Math.random() - 0.5) * 0.10,
+                pitch: (Math.random() - 0.5) * 0.06,
+            };
+            this.nextSaccadeAt = now + 900 + Math.random() * 2200;
+        }
+        const saccadeBlend = 1 - Math.exp(-dt * 12);
+        this.saccade.yaw += (this.saccadeTarget.yaw - this.saccade.yaw) * saccadeBlend;
+        this.saccade.pitch += (this.saccadeTarget.pitch - this.saccade.pitch) * saccadeBlend;
+
         const idleAmount = now - this.motionLastUpdate > 3500 ? 1 : 0;
         const idle = {
             headYaw: Math.sin(this.motionTime * 0.45) * 0.035 * idleAmount,
@@ -203,14 +331,28 @@ export class Avatar {
             this.motion[key] += (target - this.motion[key]) * blend;
         }
 
+        // A restrained half-nod while the user is speaking signals listening.
+        const nod = this.listening ? Math.sin(this.motionTime * 2.8) * 0.035 : 0;
         const applyRotation = (node, offsets) => {
             const base = this.motionBase.get(node);
             if (!node || !base) return;
             node.rotation.set(base.x + offsets.pitch, base.y + offsets.yaw, base.z + offsets.roll);
         };
-        applyRotation(this.head, {pitch: this.motion.headPitch, yaw: this.motion.headYaw, roll: this.motion.headRoll});
-        applyRotation(this.leftEye, {pitch: this.motion.eyePitch, yaw: this.motion.eyeYaw, roll: 0});
-        applyRotation(this.rightEye, {pitch: this.motion.eyePitch, yaw: this.motion.eyeYaw, roll: 0});
+        applyRotation(this.head, {
+            pitch: this.motion.headPitch + nod,
+            yaw: this.motion.headYaw,
+            roll: this.motion.headRoll,
+        });
+        applyRotation(this.leftEye, {
+            pitch: this.motion.eyePitch + this.saccade.pitch,
+            yaw: this.motion.eyeYaw + this.saccade.yaw,
+            roll: 0,
+        });
+        applyRotation(this.rightEye, {
+            pitch: this.motion.eyePitch + this.saccade.pitch,
+            yaw: this.motion.eyeYaw + this.saccade.yaw,
+            roll: 0,
+        });
     }
 
     // blink eyes, or close if disconected

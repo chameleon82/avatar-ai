@@ -102,30 +102,36 @@ const cameraStreamer = new CameraStreamer({
     jpegQuality: 0.6,
     facingMode: 'user',
     previewVideoEl: camPreviewEl,
-    onFrame: (dataUrl) => {
-        // IMPORTANT: images are only captured while we decide “user is speaking”.
-        // Still guard against realtime socket state.
-        if (!realtimeClient || !realtimeClient.isOpen) return;
+     onFrame: (dataUrl) => {
+         // When the camera is enabled, sample the latest frame for silent face tracking.
+         if (!realtimeClient || !realtimeClient.isOpen) return;
 
-        // Send an image message WITHOUT requesting a response each time.
-        // (Keeps bandwidth and token usage sane.)
-        const evt = {
-            event_id: "event_" + eventId++,
-            type: "conversation.item.create",
-            previous_item_id: null,
-            item: {
-                type: "message",
-                role: "user",
-                content: [
-                    {
-                        type: "input_image",
-                        image_url: dataUrl
-                    }
-                ]
-            }
-        };
-        realtimeClient.sendEvent(evt);
-    },
+         const evt = {
+             event_id: "event_" + eventId++,
+             type: "conversation.item.create",
+             previous_item_id: null,
+             item: {
+                 type: "message",
+                 role: "user",
+                 content: [{type: "input_image", image_url: dataUrl}]
+             }
+         };
+         realtimeClient.sendEvent(evt);
+
+         const now = performance.now();
+         if (cameraEnabled && !trackingRequestInFlight && now - lastTrackingRequestAt >= TRACKING_INTERVAL_MS) {
+             trackingRequestInFlight = true;
+             lastTrackingRequestAt = now;
+             realtimeClient.sendEvent({
+                 event_id: "event_" + eventId++,
+                 type: "response.create",
+                 response: {
+                     output_modalities: ['text'],
+                      instructions: 'Inspect the newest webcam image. Call set_avatar_tracking exactly once. Treat faceX and faceY as the face center in the unmirrored image: -1 is left/top and 1 is right/bottom. Estimate distance in cm (normally 50). Return confidence 0..1. Do not answer or speak.'
+                 }
+             });
+         }
+     },
     onError: (e) => {
         console.error('[camera] error', e);
         // If user blocks permissions, revert UI state.
@@ -138,12 +144,15 @@ const cameraStreamer = new CameraStreamer({
 
 // Camera policy:
 // - You manually enable/disable camera via the camera button.
-// - When enabled, we ONLY capture/send frames while you are speaking (server VAD events).
-// This avoids burning tokens while you are silent.
-let cameraEnabled = false;
-let cameraCapturing = false;
-let cameraStopTimerId = null;
-const CAMERA_TAIL_MS = 1500; // keep a tiny tail after speech stops
+// - While enabled, low-rate frames are sent for silent face tracking.
+// - Voice VAD may also request capture, but does not own the camera lifecycle.
+ let cameraEnabled = false;
+ let cameraCapturing = false;
+ let cameraStopTimerId = null;
+ let trackingRequestInFlight = false;
+ let lastTrackingRequestAt = 0;
+ const TRACKING_INTERVAL_MS = 1200;
+ const CAMERA_TAIL_MS = 1500; // keep a tiny tail after speech stops
 
 async function startCameraCapture() {
     if (!cameraEnabled || cameraCapturing) return;
@@ -517,7 +526,7 @@ function initAI() {
         },
         onClose: () => {
             avatar.setSleep(true);
-            stopCameraCapture();
+            avatar.setListening(false);
             console.debug('Disconnected from OpenAI WebSocket');
         },
         onError: (error) => console.error('WebSocket Error:', error),
@@ -529,6 +538,31 @@ function initAI() {
 
             if (response["type"] === 'error') {
                 console.error('[realtime] server error:', response.error || response);
+                return;
+            }
+            if (response["type"] === 'response.function_call_arguments.done' && response.name === 'set_avatar_expression') {
+                try {
+                    const expression = JSON.parse(response.arguments || '{}');
+                    avatar.setExpression(expression);
+                    avatar.setGesture({type: expression.gesture, intensity: expression.gestureIntensity});
+                    realtimeClient.sendFunctionOutput(response.call_id, 'Avatar expression applied.');
+                } catch (error) {
+                    console.warn('[avatar] invalid expression cue', error);
+                    realtimeClient.sendFunctionOutput(response.call_id, 'Expression cue ignored because it was invalid.');
+                }
+                return;
+            }
+            if (response["type"] === 'response.function_call_arguments.done' && response.name === 'set_avatar_tracking') {
+                try {
+                    const tracking = JSON.parse(response.arguments || '{}');
+                    avatar.setTracking(tracking);
+                    realtimeClient.sendFunctionOutput(response.call_id, 'Tracking applied.', {silent: true});
+                } catch (error) {
+                    console.warn('[avatar] invalid tracking cue', error);
+                    realtimeClient.sendFunctionOutput(response.call_id, 'Tracking cue ignored because it was invalid.', {silent: true});
+                } finally {
+                    trackingRequestInFlight = false;
+                }
                 return;
             }
             if (response["type"] === 'response.function_call_arguments.done' && response.name === 'set_avatar_motion') {
@@ -543,6 +577,7 @@ function initAI() {
                 return;
             }
             if (response["type"] === "input_audio_buffer.speech_started" || response["type"] === "speech_started") {
+                avatar.setListening(true);
                 startCameraCapture();
                 return;
             }
@@ -551,7 +586,8 @@ function initAI() {
                 response["type"] === "input_audio_buffer.speech_ended" ||
                 response["type"] === "speech_stopped"
             ) {
-                scheduleStopCameraCapture(CAMERA_TAIL_MS);
+                avatar.setListening(false);
+                if (!cameraEnabled) scheduleStopCameraCapture(CAMERA_TAIL_MS);
                 return;
             }
 
@@ -691,8 +727,8 @@ document.getElementById('mic').addEventListener('click', async () => {
         } catch (_) {
         }
 
-        // Stop sending frames. Keep webcam ON if camera is enabled.
-        stopCameraCapture();
+        // Keep camera tracking alive when only the microphone is turned off.
+        if (!cameraEnabled) stopCameraCapture();
     }
 
 });
@@ -708,10 +744,11 @@ document.getElementById('cam').addEventListener('click', async () => {
         btnClassList.add(recClass);
         cameraEnabled = true;
 
-        // Turn webcam ON immediately (preview), but do not start capture.
+        // Turn webcam ON immediately and start low-rate tracking capture.
         await ensureCameraOn();
+        await startCameraCapture();
 
-        // Ensure realtime socket is up (needed for VAD events)
+        // Ensure realtime socket is up (needed for VAD events and tracking).
         if (!realtimeClient || !realtimeClient.isOpen) {
             try {
                 initAI();
@@ -721,6 +758,8 @@ document.getElementById('cam').addEventListener('click', async () => {
     } else {
         btnClassList.remove(recClass);
         cameraEnabled = false;
+        trackingRequestInFlight = false;
+        lastTrackingRequestAt = 0;
 
         // Stop capture AND turn webcam off.
         stopCameraCapture();
