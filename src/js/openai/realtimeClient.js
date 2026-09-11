@@ -14,6 +14,7 @@ export class RealtimeClient {
         turnDetection,
         voice = 'sage',
         debug = false,
+        tools = [],
     }) {
         this.baseUrl = baseUrl;
         this.model = model;
@@ -29,6 +30,7 @@ export class RealtimeClient {
         this.turnDetection = turnDetection;
         this.voice = voice;
         this.debug = debug;
+        this.tools = Array.isArray(tools) ? tools : [];
 
         this.socket = null;
         this._eventId = 1;
@@ -129,7 +131,6 @@ export class RealtimeClient {
                                 required: [],
                                 additionalProperties: false,
                             },
-
                         }, {
                             type: 'function',
                             name: 'set_avatar_tracking',
@@ -165,7 +166,7 @@ export class RealtimeClient {
                                 required: ['emotion', 'intensity', 'gesture', 'gestureIntensity'],
                                 additionalProperties: false,
                             },
-                        }],
+                        }, ...this.tools],
                         max_output_tokens: 'inf',
                     },
                 };

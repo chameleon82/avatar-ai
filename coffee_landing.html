@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Café Companion</title>
+    <link rel="stylesheet" href="src/style/coffee.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/three@0.136/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/FBXLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three/examples/js/loaders/GLTFLoader.js"></script>
+    <script type="module" src="src/js/coffeeLanding.js"></script>
+    <style>#coffeeSettingsPanel[hidden],#paymentPanel[hidden]{display:none!important}</style>
+</head>
+<body>
+<header class="coffee-header">
+    <div>
+        <p class="eyebrow">WELCOME TO</p>
+        <h1>Bean &amp; Bloom</h1>
+        <p class="subtitle">A warm cup and a little conversation.</p>
+    </div>
+    <button id="coffeeSettings" class="icon-button" aria-label="Open settings"><i class="fa-solid fa-gear"></i></button>
+</header>
+
+<main class="coffee-layout">
+    <section class="avatar-card" aria-label="Your barista">
+        <div id="baristaStatus" class="status-pill">Offline</div>
+        <div id="avatarMount" class="avatar-mount"></div>
+        <div class="barista-caption">
+            <span class="barista-dot"></span>
+            <span id="baristaName">Your barista is waiting</span>
+        </div>
+        <div class="voice-controls">
+            <button id="coffeeMic" class="round-button" aria-label="Start voice ordering"><i class="fa-solid fa-microphone"></i></button>
+            <button id="coffeeTextSend" class="round-button" aria-label="Send message"><i class="fa-solid fa-paper-plane"></i></button>
+            <input id="coffeeText" type="text" placeholder="Tell me what you'd like…" autocomplete="off">
+        </div>
+    </section>
+
+    <section class="shop-panel">
+        <div class="panel-heading">
+            <div><p class="eyebrow">TODAY'S MENU</p><h2>Choose your comfort</h2></div>
+            <span class="open-tag">OPEN</span>
+        </div>
+        <div id="menuGrid" class="menu-grid"></div>
+        <div class="basket-card">
+            <div class="basket-heading"><h2>Your order</h2><span id="basketCount">0 items</span></div>
+            <div id="basketLines" class="basket-lines"><p class="empty-basket">Your basket is waiting for its first treat.</p></div>
+            <div class="basket-total"><span>Total</span><strong id="basketTotal">$0.00</strong></div>
+            <button id="payButton" class="pay-button" disabled>Ask to pay</button>
+            <button id="nextCustomerButton" class="next-button" hidden>Start next customer</button>
+        </div>
+    </section>
+</main>
+
+<section id="paymentPanel" class="payment-panel" hidden>
+    <div class="payment-dialog">
+        <button id="closePayment" class="close-button" aria-label="Close payment">×</button>
+        <p class="eyebrow">SIMULATED CHECKOUT</p>
+        <h2>Scan to pay <span id="paymentAmount">$0.00</span></h2>
+        <div id="qrCode" class="qr-code" aria-label="Simulated QR code"></div>
+        <code id="paymentReference"></code>
+        <p class="payment-note">This is a demo. No money will be charged.</p>
+        <div class="payment-actions">
+            <button id="paymentSuccess" class="success-button">Payment succeeded</button>
+            <button id="paymentFailure" class="failure-button">Payment failed</button>
+        </div>
+    </div>
+</section>
+
+<div id="coffeeSettingsPanel" class="settings-panel" hidden>
+    <div class="settings-dialog">
+        <button id="closeSettings" class="close-button" aria-label="Close settings">×</button>
+        <p class="eyebrow">CONNECTION</p><h2>Barista settings</h2>
+        <label>OpenAI Base URL<input id="coffeeBaseUrl" type="text" placeholder="https://api.openai.com"></label>
+        <label>Realtime model<input id="coffeeModel" type="text" placeholder="gpt-realtime-mini"></label>
+        <label>Avatar<select id="coffeeAvatar"><option value="avatar-w">Milena — Sage</option><option value="avatar">Alex — Alloy</option><option value="avatar-m">Marcus — Echo</option></select></label>
+        <label>OpenAI API key<input id="coffeeApiKey" type="password" placeholder="sk-…" autocomplete="off"></label>
+        <label class="check-label"><input id="coffeeRemember" type="checkbox"> Remember key on this device</label>
+        <button id="saveCoffeeSettings" class="save-button">Save and connect</button>
+    </div>
+</div>
+</body>
+</html>
