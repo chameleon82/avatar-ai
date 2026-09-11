@@ -63,8 +63,6 @@ export class RealtimeClient {
                 'realtime',
                 // Browser auth (as in your current code)
                 'openai-insecure-api-key.' + this.apiKey,
-                // Beta protocol
-                'openai-beta.realtime-v1',
             ]
         );
 
