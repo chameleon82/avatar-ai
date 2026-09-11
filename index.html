@@ -132,6 +132,34 @@
     </div>
 </div>
 
-
+<!-- Visible only with ?avatarDebug=1 or localStorage avatarDebug=1. -->
+<section id="avatarAdjusters" class="avatar-adjusters" hidden aria-label="Avatar debug adjusters">
+    <div class="avatar-adjusters-header">
+        <strong>Avatar debug adjusters</strong>
+        <button id="avatarAdjustersClose" type="button" aria-label="Close debug adjusters">×</button>
+    </div>
+    <p>Drag sliders to tune the current arm pose. Changes apply live.</p>
+    <div class="avatar-adjusters-grid">
+        <label>Left arm lift <output id="leftArmLiftValue">0.00</output><input id="leftArmLiftAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Right arm lift <output id="rightArmLiftValue">0.00</output><input id="rightArmLiftAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Left arm side <output id="leftArmSideValue">0.00</output><input id="leftArmSideAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Right arm side <output id="rightArmSideValue">0.00</output><input id="rightArmSideAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Left elbow bend <output id="leftForearmBendValue">0.00</output><input id="leftForearmBendAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Right elbow bend <output id="rightForearmBendValue">0.00</output><input id="rightForearmBendAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Left hand twist <output id="leftHandTwistValue">0.00</output><input id="leftHandTwistAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Right hand twist <output id="rightHandTwistValue">0.00</output><input id="rightHandTwistAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Left finger curl <output id="leftFingerCurlValue">0.00</output><input id="leftFingerCurlAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Right finger curl <output id="rightFingerCurlValue">0.00</output><input id="rightFingerCurlAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Left finger spread <output id="leftFingerSpreadValue">0.00</output><input id="leftFingerSpreadAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Right finger spread <output id="rightFingerSpreadValue">0.00</output><input id="rightFingerSpreadAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Shoulder lift <output id="shoulderLiftValue">0.00</output><input id="shoulderLiftAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Posture <output id="postureValue">0.00</output><input id="postureAdjuster" type="range" min="-1" max="1" step="0.01" value="0"></label>
+        <label>Camera zoom <output id="avatarZoomValue">1.00×</output><input id="avatarZoomAdjuster" type="range" min="0.5" max="2.5" step="0.01" value="1"></label>
+    </div>
+    <div class="avatar-adjusters-actions">
+        <button id="avatarAdjustersReset" type="button">Reset pose</button>
+        <button id="avatarAdjustersReport" type="button">Log pose</button>
+    </div>
+</section>
 </body>
 </html>

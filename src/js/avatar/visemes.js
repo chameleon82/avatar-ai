@@ -310,18 +310,18 @@ export function createOutputTracker({
                         const airRatio = total > 0 ? air / total : 0;
                         const c = Number.isFinite(centroid) ? Math.round(centroid) : 'null';
 
-                        console.log(
-                            [
-                                '[viseme-debug]',
-                                `viseme=${viseme ?? 'null'}`,
-                                `rms=${rms.toFixed(4)}`,
-                                `centroid=${c}`,
-                                `low=${lowRatio.toFixed(3)}`,
-                                `mid=${midRatio.toFixed(3)}`,
-                                `high=${highRatio.toFixed(3)}`,
-                                `air=${airRatio.toFixed(3)}`,
-                            ].join(' ')
-                        );
+                        // console.log(
+                        //     [
+                        //         '[viseme-debug]',
+                        //         `viseme=${viseme ?? 'null'}`,
+                        //         `rms=${rms.toFixed(4)}`,
+                        //         `centroid=${c}`,
+                        //         `low=${lowRatio.toFixed(3)}`,
+                        //         `mid=${midRatio.toFixed(3)}`,
+                        //         `high=${highRatio.toFixed(3)}`,
+                        //         `air=${airRatio.toFixed(3)}`,
+                        //     ].join(' ')
+                        // );
                     }
                 }
 

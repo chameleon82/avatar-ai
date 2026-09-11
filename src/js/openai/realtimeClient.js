@@ -32,6 +32,8 @@ export class RealtimeClient {
 
         this.socket = null;
         this._eventId = 1;
+        this.responseInProgress = false;
+        this.pendingResponses = [];
     }
 
     get isOpen() {
@@ -98,19 +100,36 @@ export class RealtimeClient {
                         tools: [{
                             type: 'function',
                             name: 'set_avatar_motion',
-                            description: 'Move the avatar head and eyes to convey attention and emotion. Call sparingly, usually once per response or when the conversational emotion changes.',
+                            description: 'Control the avatar body nonverbally, including individual Ready Player Me finger curling and spreading. Use fingerGesture open for an open palm, fist for a closed hand, point for pointing, and peace for a V sign. Do not merely describe gestures in speech.',
                             parameters: {
                                 type: 'object',
                                 properties: {
-                                    headYaw: {type: 'number', description: 'Head left/right in degrees, negative is left, range -18 to 18.'},
-                                    headPitch: {type: 'number', description: 'Head up/down in degrees, negative is down, range -12 to 12.'},
-                                    headRoll: {type: 'number', description: 'Head tilt in degrees, range -10 to 10.'},
-                                    eyeYaw: {type: 'number', description: 'Eye gaze left/right in degrees, range -24 to 24.'},
-                                    eyePitch: {type: 'number', description: 'Eye gaze up/down in degrees, range -14 to 14.'},
+                                    headYaw: {type: 'number', description: 'Head left/right degrees, range -18 to 18.'},
+                                    headPitch: {type: 'number', description: 'Head up/down degrees, range -12 to 12.'},
+                                    headRoll: {type: 'number', description: 'Head tilt degrees, range -10 to 10.'},
+                                    eyeYaw: {type: 'number', description: 'Eye gaze left/right degrees, range -24 to 24.'},
+                                    eyePitch: {type: 'number', description: 'Eye gaze up/down degrees, range -14 to 14.'},
+                                    shoulderLift: {type: 'number', description: 'Shoulder shrug from -1 to 1.'},
+                                    posture: {type: 'number', description: 'Posture from slouched (-1) to upright (1).'},
+                                    leftArmLift: {type: 'number', description: 'Avatar left arm lift from -1 to 1.'},
+                                    rightArmLift: {type: 'number', description: 'Avatar right arm lift from -1 to 1.'},
+                                    leftArmSide: {type: 'number', description: 'Avatar left arm side sweep from -1 to 1.'},
+                                    rightArmSide: {type: 'number', description: 'Avatar right arm side sweep from -1 to 1.'},
+                                    leftForearmBend: {type: 'number', description: 'Avatar left elbow bend from -1 to 1.'},
+                                    rightForearmBend: {type: 'number', description: 'Avatar right elbow bend from -1 to 1.'},
+                                    leftHandTwist: {type: 'number', description: 'Avatar left hand twist from -1 to 1.'},
+                                    rightHandTwist: {type: 'number', description: 'Avatar right hand twist from -1 to 1.'},
+                                    leftFingerCurl: {type: 'number', description: 'Curl left fingers: -1 open, 0 neutral, 1 fist.'},
+                                    rightFingerCurl: {type: 'number', description: 'Curl right fingers: -1 open, 0 neutral, 1 fist.'},
+                                    leftFingerSpread: {type: 'number', description: 'Spread left fingers from -1 to 1.'},
+                                    rightFingerSpread: {type: 'number', description: 'Spread right fingers from -1 to 1.'},
+                                    fingerGesture: {type: 'string', enum: ['neutral', 'open', 'fist', 'point', 'peace'], description: 'Named finger pose; explicit curl/spread values override it.'},
+                                    handGesture: {type: 'string', enum: ['none', 'open', 'wave', 'point', 'raise', 'shrug', 'talk'], description: 'Named arm gesture.'},
                                 },
-                                required: ['headYaw', 'headPitch', 'headRoll', 'eyeYaw', 'eyePitch'],
+                                required: [],
                                 additionalProperties: false,
                             },
+
                         }, {
                             type: 'function',
                             name: 'set_avatar_tracking',
@@ -126,6 +145,11 @@ export class RealtimeClient {
                                 required: ['faceX', 'faceY', 'distanceCm', 'confidence'],
                                 additionalProperties: false,
                             },
+                        }, {
+                            type: 'function',
+                            name: 'get_avatar_debug',
+                            description: 'Read the avatar rig and current world-space joint pose for calibration. Call this after a movement when the user reports that a hand is crossed, too low, behind the back, or otherwise incorrect. Compare left/right wrist positions and rotations before choosing a correction. Do not speak just because this function is called.',
+                            parameters: {type: 'object', properties: {}, additionalProperties: false},
                         }, {
                             type: 'function',
                             name: 'set_avatar_expression',
@@ -156,6 +180,7 @@ export class RealtimeClient {
         this.socket.onmessage = (event) => {
             try {
                 const msg = JSON.parse(event.data);
+                this._observeResponseState(msg);
                 if (this.debug) console.debug('[realtime] received:', msg);
                 if (this.onMessage) this.onMessage(msg);
             } catch (e) {
@@ -211,6 +236,46 @@ export class RealtimeClient {
     }
 
 
+    _observeResponseState(msg) {
+        if (msg.type === 'response.created') {
+            this.responseInProgress = true;
+            return;
+        }
+
+        if (msg.type === 'response.done' || msg.type === 'response.completed' ||
+            msg.type === 'response.failed' || msg.type === 'response.cancelled') {
+            this.responseInProgress = false;
+            this._flushPendingResponse();
+        }
+    }
+
+    _flushPendingResponse() {
+        if (this.responseInProgress || !this.isOpen || !this.pendingResponses.length) return;
+        const response = this.pendingResponses.shift();
+        this.responseInProgress = true;
+        this.sendEvent({
+            event_id: this._nextEventId(),
+            type: 'response.create',
+            ...(Object.keys(response).length ? {response} : {}),
+        });
+    }
+
+    requestResponse(response = {}) {
+        if (!this.isOpen) return false;
+        if (this.responseInProgress) {
+            this.pendingResponses.push(response);
+            if (this.debug) console.debug('[realtime] response.create queued; response still active');
+            return false;
+        }
+        this.responseInProgress = true;
+        this.sendEvent({
+            event_id: this._nextEventId(),
+            type: 'response.create',
+            ...(Object.keys(response).length ? {response} : {}),
+        });
+        return true;
+    }
+
     sendFunctionOutput(callId, output = 'ok', {silent = false} = {}) {
         if (!this.isOpen || !callId) return;
         this.sendEvent({
@@ -222,14 +287,10 @@ export class RealtimeClient {
                 output: typeof output === 'string' ? output : JSON.stringify(output),
             },
         });
-        this.sendEvent({
-            event_id: this._nextEventId(),
-            type: 'response.create',
-            ...(silent ? {response: {
-                output_modalities: ['text'],
-                instructions: 'Do not speak. Finish the camera-tracking tool turn silently.',
-            }} : {}),
-        });
+        this.requestResponse(silent ? {
+            output_modalities: ['text'],
+            instructions: 'Do not speak. Finish the camera-tracking tool turn silently.',
+        } : {});
     }
 
     appendInputAudioBase64(audioBase64) {
@@ -259,9 +320,6 @@ export class RealtimeClient {
                 content: [{type: 'input_text', text}],
             },
         });
-        this.sendEvent({
-            event_id: this._nextEventId(),
-            type: 'response.create',
-        });
+        this.requestResponse();
     }
 }

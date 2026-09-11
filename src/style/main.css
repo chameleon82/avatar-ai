@@ -250,3 +250,78 @@ button.mic:hover {
 
 
 
+.avatar-adjusters {
+    position: fixed;
+    left: 16px;
+    top: 16px;
+    z-index: 10001;
+    width: min(360px, calc(100vw - 32px));
+    max-height: calc(100vh - 32px);
+    overflow-y: auto;
+    box-sizing: border-box;
+    padding: 14px;
+    color: #00ffea;
+    background: rgba(13, 13, 13, 0.96);
+    border: 2px solid #00ffea;
+    border-radius: 8px;
+    box-shadow: 0 0 8px #00ffea, 0 0 20px rgba(0, 255, 234, 0.5);
+    font-family: 'Orbitron', sans-serif;
+    font-size: 12px;
+}
+
+.avatar-adjusters[hidden] {
+    display: none;
+}
+
+.avatar-adjusters-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 14px;
+}
+
+.avatar-adjusters-header button {
+    padding: 2px 8px;
+    border-color: #00ffea;
+    color: #00ffea;
+}
+
+.avatar-adjusters p {
+    margin: 10px 0;
+    line-height: 1.4;
+}
+
+.avatar-adjusters-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.avatar-adjusters label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.avatar-adjusters output {
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+
+.avatar-adjusters input[type="range"] {
+    width: 100%;
+    accent-color: #00ffea;
+}
+
+.avatar-adjusters-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.avatar-adjusters-actions button {
+    flex: 1;
+    padding: 8px;
+    font-size: 11px;
+}

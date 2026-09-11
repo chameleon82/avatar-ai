@@ -10,11 +10,23 @@ const AVATAR_OPTIONS = {
     'avatar-m': {model: './src/assets/avatar-m.glb', voice: 'echo'},
 };
 
-let avatar = new Avatar(AVATAR_OPTIONS['avatar-w'].model);
+const avatarDebugEnabled = new URLSearchParams(window.location.search).has('avatarDebug') || localStorage.getItem('avatarDebug') === '1';
+let avatar = new Avatar(AVATAR_OPTIONS['avatar-w'].model, {debug: avatarDebugEnabled});
 // The selected avatar and its voice are configured together in Settings.
 let realtimeClient = null;
 let pendingText = [];
-
+function parseToolArguments(rawArguments) {
+    const raw = typeof rawArguments === 'string' ? rawArguments.trim() : '';
+    if (!raw) return {};
+    const withoutMarkdown = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    try {
+        return JSON.parse(withoutMarkdown);
+    } catch (error) {
+        const repaired = withoutMarkdown.replace(/,\s*([}\]])/g, '$1');
+        if (repaired !== withoutMarkdown) return JSON.parse(repaired);
+        throw new SyntaxError(`${error.message}; raw tool arguments: ${withoutMarkdown}`);
+    }
+}
 // ---- Prevent device sleep while this page is open (Screen Wake Lock) ----
 // Notes:
 // - Requires a user gesture to activate in most browsers.
@@ -122,13 +134,9 @@ const cameraStreamer = new CameraStreamer({
          if (cameraEnabled && !trackingRequestInFlight && now - lastTrackingRequestAt >= TRACKING_INTERVAL_MS) {
              trackingRequestInFlight = true;
              lastTrackingRequestAt = now;
-             realtimeClient.sendEvent({
-                 event_id: "event_" + eventId++,
-                 type: "response.create",
-                 response: {
-                     output_modalities: ['text'],
-                      instructions: 'Inspect the newest webcam image. Call set_avatar_tracking exactly once. Treat faceX and faceY as the face center in the unmirrored image: -1 is left/top and 1 is right/bottom. Estimate distance in cm (normally 50). Return confidence 0..1. Do not answer or speak.'
-                 }
+             realtimeClient.requestResponse({
+                 output_modalities: ['text'],
+                 instructions: 'Inspect the newest webcam image. Call set_avatar_tracking exactly once. Treat faceX and faceY as the face center in the unmirrored image: -1 is left/top and 1 is right/bottom. Estimate distance in cm (normally 50). Return confidence 0..1. Do not answer or speak.'
              });
          }
      },
@@ -219,6 +227,7 @@ async function init() {
 
     document.body.appendChild(avatar.renderer.domElement);
     resizeAvatarRenderer();
+    setupAvatarAdjusters();
     window.addEventListener('resize', resizeAvatarRenderer);
 }
 
@@ -273,7 +282,7 @@ function resizeAvatarRenderer() {
 function applyAvatarSelection(id) {
     const option = getAvatarOption(id);
     const previous = avatar;
-    avatar = new Avatar(option.model);
+    avatar = new Avatar(option.model, {debug: avatarDebugEnabled});
 
     // Replace the rendered canvas without leaving the old render loop running.
     if (previous && previous.renderer) {
@@ -285,6 +294,103 @@ function applyAvatarSelection(id) {
     // A new WebGL canvas starts at 300x150 unless it is explicitly sized.
     // Keep replacement avatars in the same full-screen viewport as the original.
     resizeAvatarRenderer();
+}
+
+// Console diagnostics for rig and movement troubleshooting.
+// Enable with: avatarDebug.enable(); then run avatarDebug.report() or avatarDebug.testMotion().
+window.avatarDebug = {
+    enable() {
+        localStorage.setItem('avatarDebug', '1');
+        avatar.setDebug(true);
+        document.getElementById('avatarAdjusters')?.removeAttribute('hidden');
+        return avatar.getDebugReport();
+    },
+    disable() {
+        localStorage.removeItem('avatarDebug');
+        avatar.setDebug(false);
+        document.getElementById('avatarAdjusters')?.setAttribute('hidden', '');
+    },
+    report() {
+        const report = avatar.getDebugReport();
+        console.table(report.nodes);
+        console.log('[avatar debug] full report', report);
+        console.log('[avatar debug] pose snapshot', avatar.getPoseSnapshot());
+        return {...report, pose: avatar.getPoseSnapshot()};
+    },
+    pose() {
+        const snapshot = avatar.getPoseSnapshot();
+        console.table(Object.fromEntries(Object.entries(snapshot.joints).map(([key, value]) => [key, value?.position])));
+        return snapshot;
+    },
+    testMotion() {
+        avatar.setMotion({headYaw: 10, headPitch: 6, headRoll: 5, eyeYaw: 12, eyePitch: 6, leftArmLift: 0.65, rightArmLift: 0.35, leftArmSide: 0.8, rightArmSide: 0.8, leftForearmBend: 0.45, rightForearmBend: 0.7, leftHandTwist: 0.3, rightHandTwist: -0.25, leftFingerCurl: 0.7, rightFingerCurl: 0.7, leftFingerSpread: 0.2, rightFingerSpread: 0.2, fingerGesture: 'fist', handGesture: 'wave'});
+        avatar.setBodyMotion({shoulderLift: 0.7, posture: 0.7});
+        console.info('[avatar debug] testMotion applied; run avatarDebug.pose() after 1 second');
+        return avatar.getDebugReport();
+    },
+};
+
+function setupAvatarAdjusters() {
+    const panel = document.getElementById('avatarAdjusters');
+    if (!panel) return;
+
+    panel.hidden = !avatarDebugEnabled;
+     const keys = ['leftArmLift', 'rightArmLift', 'leftArmSide', 'rightArmSide', 'leftForearmBend', 'rightForearmBend', 'leftHandTwist', 'rightHandTwist', 'leftFingerCurl', 'rightFingerCurl', 'leftFingerSpread', 'rightFingerSpread'];
+    const bodyKeys = ['shoulderLift', 'posture'];
+    const zoomInput = document.getElementById('avatarZoomAdjuster');
+    const zoomOutput = document.getElementById('avatarZoomValue');
+    const readValues = () => Object.fromEntries(keys.map((key) => [key, Number(document.getElementById(key + 'Adjuster').value)]));
+    const readBodyValues = () => Object.fromEntries(bodyKeys.map((key) => [key, Number(document.getElementById(key + 'Adjuster').value)]));
+    const renderValues = (values) => {
+        for (const key of [...keys, ...bodyKeys]) {
+            const input = document.getElementById(key + 'Adjuster');
+            const output = document.getElementById(key + 'Value');
+            if (!input || !output) continue;
+            input.value = String(values[key] ?? 0);
+            output.value = Number(input.value).toFixed(2);
+            output.textContent = output.value;
+        }
+    };
+    const apply = () => {
+        const values = readValues();
+        const bodyValues = readBodyValues();
+        avatar.setHandAdjustments({...values, fingerGesture: 'neutral', handGesture: 'none'});
+        avatar.setBodyMotion(bodyValues);
+        console.info('[avatar debug] manual adjusters applied', {...values, ...bodyValues, pose: avatar.getPoseSnapshot()});
+    };
+
+    for (const key of [...keys, ...bodyKeys]) {
+        const input = document.getElementById(key + 'Adjuster');
+        const output = document.getElementById(key + 'Value');
+        input?.addEventListener('input', () => {
+            if (output) {
+                output.value = Number(input.value).toFixed(2);
+                output.textContent = output.value;
+            }
+            apply();
+        });
+    }
+    zoomInput?.addEventListener('input', () => {
+        const zoom = Number(zoomInput.value);
+        if (zoomOutput) zoomOutput.textContent = `${zoom.toFixed(2)}×`;
+        avatar.setZoom(zoom);
+        console.info('[avatar debug] manual zoom applied', {zoom});
+    });
+    document.getElementById('avatarAdjustersReset')?.addEventListener('click', () => {
+        const zero = Object.fromEntries([...keys, ...bodyKeys].map((key) => [key, 0]));
+        renderValues(zero);
+        if (zoomInput) zoomInput.value = '1';
+        if (zoomOutput) zoomOutput.textContent = '1.00×';
+        avatar.setZoom(1);
+        apply();
+    });
+    document.getElementById('avatarAdjustersReport')?.addEventListener('click', () => {
+        console.info('[avatar debug] manual adjusters pose', avatar.getPoseSnapshot());
+    });
+    document.getElementById('avatarAdjustersClose')?.addEventListener('click', () => {
+        panel.hidden = true;
+    });
+    renderValues(Object.fromEntries([...keys, ...bodyKeys].map((key) => [key, 0])));
 }
 
 function selectedAvatarId() {
@@ -489,15 +595,16 @@ function historyAsTextBlock() {
     return lines.join('\n');
 }
 
-const BASE_INSTRUCTIONS = "You are Milena, my close friend and smart companion. Your voice is heard through a synced avatar. Communication style: warm, natural, concise. Default to 1–3 short sentences. Never add end-of-message invitations or follow-ups. STRICTLY FORBIDDEN phrases (and similar): 'if you need more', 'if you have questions', 'feel free', 'let me know', 'reach out'. Do NOT close with pleasantries or meta lines. End after the useful content. Ask a question only if it is strictly required to proceed; ask at most one. Avoid meta talk, disclaimers, long preambles, and summaries. No bullet lists unless I ask. If I’m silent, stay silent. If I ask for code/config, give the exact change with minimal explanation.";
+const BASE_INSTRUCTIONS = "You are Milena, my close friend and smart companion. Your voice is heard through a synced avatar. Communication style: warm, natural, concise. Default to 1–3 short sentences. Nonverbal avatar control: use the set_avatar_motion function whenever body language adds meaning. The avatar has Ready Player Me Hips, Spine, Neck, Head, Left/RightShoulder, Left/RightArm, Left/RightForeArm, Left/RightHand, and usually Left/RightHandThumb1-3, Index1-3, Middle1-3, Ring1-3, and Pinky1-3 finger bones. For hello or goodbye, call set_avatar_motion with handGesture='wave' and a noticeable but natural arm lift. If the user asks to raise one or both hands above the head, call set_avatar_motion with handGesture='raise', use leftArmLift=1 and/or rightArmLift=1, and keep the corresponding forearm bend near 0. For finger poses, use fingerGesture='open' for an open palm, 'fist' for a closed hand, 'point' for pointing, and 'peace' for a V sign; use left/rightFingerCurl and left/rightFingerSpread for finer control. For uncertainty use 'shrug'; for indicating something use 'point'; for open emphasis use 'open'; for occasional conversational emphasis use 'talk'. When using a hand gesture, set the corresponding arm lift and forearm bend to non-zero values except for the special above-head raise gesture; do not only say that you are gesturing. Keep gestures brief and subtle, and return to handGesture='none' after the gesture when appropriate. STRICTLY FORBIDDEN phrases (and similar): 'if you need more', 'if you have questions', 'feel free', 'let me know', 'reach out'. Do NOT close with pleasantries or meta lines. End after the useful content. Ask a question only if it is strictly required to proceed; ask at most one. Avoid meta talk, disclaimers, long preambles, and summaries. No bullet lists unless I ask. If I’m silent, stay silent. If I ask for code/config, give the exact change with minimal explanation.";
 
+const AVATAR_CALIBRATION_INSTRUCTIONS = "Avatar calibration: you can call get_avatar_debug to inspect the current rig and world-space pose. After every non-trivial hand movement, call get_avatar_debug and verify it. Compare leftHand/rightHand positions: screenRight is rightWrist.x minus leftWrist.x; if it is positive, the hands are separated in the expected viewer-left/viewer-right order, and if near zero or negative they may overlap/cross. Y is height and Z is depth toward the camera. Use leftArmSide/rightArmSide for movement sideways relative to each shoulder: positive means outward, negative inward. The snapshot reports requested versus actually smoothed applied values; wait for the applied values to approach the request before judging the result. Do not claim a pose is correct without checking the snapshot. If a correction is needed, call set_avatar_motion with explicit values, then call get_avatar_debug again.";
 function buildInstructions() {
     const extra = settings && settings.customInstructions ? String(settings.customInstructions).trim() : '';
     const prev = historyAsTextBlock();
     const prevBlock = prev ? ("\n\nPrevious conversation (same tab):\n" + prev) : '';
 
-    if (!extra) return BASE_INSTRUCTIONS + prevBlock;
-    return BASE_INSTRUCTIONS + "\n\nUser custom instructions:\n" + extra + prevBlock;
+    if (!extra) return BASE_INSTRUCTIONS + AVATAR_CALIBRATION_INSTRUCTIONS + prevBlock;
+    return BASE_INSTRUCTIONS + AVATAR_CALIBRATION_INSTRUCTIONS + "\n\nUser custom instructions:\n" + extra + prevBlock;
 }
 
 function initAI() {
@@ -552,6 +659,17 @@ function initAI() {
                 }
                 return;
             }
+            if (response["type"] === 'response.function_call_arguments.done' && response.name === 'get_avatar_debug') {
+                try {
+                    const snapshot = avatar.getPoseSnapshot();
+                    console.info('[avatar debug] get_avatar_debug snapshot', snapshot);
+                    realtimeClient.sendFunctionOutput(response.call_id, snapshot, {silent: true});
+                } catch (error) {
+                    console.warn('[avatar] unable to build pose snapshot', error);
+                    realtimeClient.sendFunctionOutput(response.call_id, {error: 'Pose snapshot unavailable.'}, {silent: true});
+                }
+                return;
+            }
             if (response["type"] === 'response.function_call_arguments.done' && response.name === 'set_avatar_tracking') {
                 try {
                     const tracking = JSON.parse(response.arguments || '{}');
@@ -567,12 +685,18 @@ function initAI() {
             }
             if (response["type"] === 'response.function_call_arguments.done' && response.name === 'set_avatar_motion') {
                 try {
-                    const motion = JSON.parse(response.arguments || '{}');
+                    const motion = parseToolArguments(response.arguments);
+                    console.info('[avatar debug] AI set_avatar_motion request', motion);
                     avatar.setMotion(motion);
-                    realtimeClient.sendFunctionOutput(response.call_id, 'Avatar movement applied.');
+                    avatar.setBodyMotion(motion);
+                    const pose = avatar.getPoseSnapshot();
+                    console.info('[avatar debug] pose returned to AI', pose);
+                    realtimeClient.sendFunctionOutput(response.call_id, {status: 'movement applied', pose});
                 } catch (error) {
                     console.warn('[avatar] invalid movement cue', error);
-                    realtimeClient.sendFunctionOutput(response.call_id, 'Movement cue ignored because it was invalid.');
+                    realtimeClient.sendFunctionOutput(response.call_id, {
+                        error: 'Invalid movement JSON. Retry set_avatar_motion with a complete JSON object and no markdown.',
+                    });
                 }
                 return;
             }
