@@ -20,7 +20,7 @@
         <h1>Bean &amp; Bloom</h1>
         <p class="subtitle">A warm cup and a little conversation.</p>
     </div>
-    <button id="coffeeSettings" class="icon-button" aria-label="Open settings"><i class="fa-solid fa-gear"></i></button>
+    <div class="header-actions"><label class="language-picker" for="coffeeLanguage">Language<select id="coffeeLanguage"><option value="en">English</option><option value="ru">Русский</option><option value="zh">中文</option><option value="th">ไทย</option></select></label><button id="coffeeSettings" class="icon-button" aria-label="Open settings"><i class="fa-solid fa-gear"></i></button></div>
 </header>
 
 <main class="coffee-layout">
@@ -40,15 +40,15 @@
 
     <section class="shop-panel">
         <div class="panel-heading">
-            <div><p class="eyebrow">TODAY'S MENU</p><h2>Choose your comfort</h2><p class="menu-note">Calories are estimates per serving.</p></div>
-            <span class="open-tag">OPEN</span>
+            <div><p id="menuEyebrow" class="eyebrow">TODAY'S MENU</p><h2 id="menuTitle">Choose your comfort</h2><p id="menuNote" class="menu-note">Calories are estimates per serving.</p></div>
+            <span id="openTag" class="open-tag">OPEN</span>
         </div>
         <div id="menuGrid" class="menu-grid"></div>
         <div class="basket-card">
-            <div class="basket-heading"><h2>Your order</h2><span id="basketCount">0 items</span></div>
+            <div class="basket-heading"><h2 id="basketTitle">Your order</h2><span id="basketCount">0 items</span></div>
             <div id="basketLines" class="basket-lines"><p class="empty-basket">Your basket is waiting for its first treat.</p></div>
-            <div class="basket-total"><span>Total</span><strong id="basketTotal">$0.00</strong></div>
-            <div class="basket-calories">Estimated calories <strong id="basketCalories">0 kcal</strong></div>
+            <div class="basket-total"><span id="basketTotalLabel">Total</span><strong id="basketTotal">$0.00</strong></div>
+            <div class="basket-calories"><span id="basketCaloriesLabel">Estimated calories</span> <strong id="basketCalories">0 kcal</strong></div>
             <button id="payButton" class="pay-button" disabled>Ask to pay</button>
             <button id="nextCustomerButton" class="next-button" hidden>Start next customer</button>
         </div>

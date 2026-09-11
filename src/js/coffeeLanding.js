@@ -50,6 +50,17 @@ const MENU = [
     {id: 'breakfast-wrap', name: 'Breakfast wrap', description: 'Egg, cheese and roasted vegetables', price: 8.90, calories: 520, icon: '🌯'},
     {id: 'oatmeal', name: 'Warm oatmeal', description: 'Oats, berries and maple', price: 5.90, calories: 310, icon: '🥣'},
 ];
+const LANGUAGES = {en: {label: 'English', speech: 'English', ui: {menu: "Today's menu", choose: 'Choose your comfort', note: 'Calories are estimates per serving.', open: 'OPEN', order: 'Your order', empty: 'Your basket is waiting for its first treat.', items: 'items', item: 'item', total: 'Total', calories: 'Estimated calories', pay: 'Ask to pay', next: 'Start next customer', placeholder: "Tell me what you'd like…", unavailable: "That item is not on today's menu."}}, ru: {label: 'Русский', speech: 'Russian', ui: {menu: 'МЕНЮ НА СЕГОДНЯ', choose: 'Выберите любимый напиток', note: 'Калорийность указана приблизительно на порцию.', open: 'ОТКРЫТО', order: 'Ваш заказ', empty: 'Корзина пока пуста.', items: 'товаров', item: 'товар', total: 'Итого', calories: 'Примерная калорийность', pay: 'Перейти к оплате', next: 'Следующий клиент', placeholder: 'Расскажите, что вы хотите…', unavailable: 'Этого товара сегодня нет в меню.'}}, zh: {label: '中文', speech: 'Chinese', ui: {menu: '今日菜单', choose: '选择您喜欢的饮品', note: '热量为每份估算值。', open: '营业中', order: '您的订单', empty: '购物篮还是空的。', items: '件商品', item: '件商品', total: '合计', calories: '预计热量', pay: '请求付款', next: '下一位顾客', placeholder: '请告诉我您想要什么…', unavailable: '这款商品今天不在菜单上。'}}, th: {label: 'ไทย', speech: 'Thai', ui: {menu: 'เมนูวันนี้', choose: 'เลือกเครื่องดื่มที่คุณชอบ', note: 'แคลอรี่เป็นค่าประมาณต่อหนึ่งหน่วยบริโภค', open: 'เปิดให้บริการ', order: 'รายการสั่งซื้อของคุณ', empty: 'ตะกร้าของคุณยังว่างอยู่', items: 'รายการ', item: 'รายการ', total: 'รวม', calories: 'แคลอรี่โดยประมาณ', pay: 'ขอชำระเงิน', next: 'ลูกค้าคนถัดไป', placeholder: 'บอกเราได้เลยว่าต้องการอะไร…', unavailable: 'รายการนี้ไม่มีในเมนูวันนี้'}}};
+const MENU_TRANSLATIONS = {
+ espresso: {ru:['Эспрессо','Крепкий, короткий и шелковистый'],zh:['浓缩咖啡','浓郁、短小而顺滑'],th:['เอสเปรสโซ','เข้มข้น หอมละมุน และเสิร์ฟแก้วเล็ก']}, 'double-espresso': {ru:['Двойной эспрессо','Вдвое больше насыщенного кофейного вкуса'],zh:['双份浓缩咖啡','双倍浓郁咖啡风味'],th:['ดับเบิลเอสเปรสโซ','รสชาติกาแฟเข้มข้นเป็นสองเท่า']}, americano:{ru:['Американо','Эспрессо с горячей водой'],zh:['美式咖啡','浓缩咖啡加热水'],th:['อเมริกาโน','เอสเปรสโซเติมน้ำร้อน']}, cortado:{ru:['Кор cortado','Баланс эспрессо и тёплого молока'],zh:['科尔塔多','浓缩咖啡与温牛奶的平衡'],th:['คอร์ตาโด','เอสเปรสโซกับนมอุ่นอย่างลงตัว']}, macchiato:{ru:['Макиато','Эспрессо с лёгкой пенкой'],zh:['玛奇朵','带有奶泡的浓缩咖啡'],th:['มัคคิอาโต','เอสเปรสโซแตะโฟมนมนุ่ม']}, cappuccino:{ru:['Капучино','Бархатистое молоко и какао'],zh:['卡布奇诺','丝滑牛奶与可可'],th:['คาปูชิโน','นมนุ่มละมุนกับโกโก้']}, 'flat-white':{ru:['Флэт уайт','Шелковистая микропена и эспрессо'],zh:['馥芮白','丝滑奶泡与浓缩咖啡'],th:['แฟลตไวท์','ไมโครโฟมนุ่มกับเอสเปรสโซ']}, latte:{ru:['Ванильный латте','Сладкая ваниль и нежная пенка'],zh:['香草拿铁','甜香草与柔软奶泡'],th:['วานิลลาลาเต้','วานิลลาหวานกับโฟมนุ่ม']}, 'caramel-latte':{ru:['Карамельный латте','Эспрессо, карамель и паровое молоко'],zh:['焦糖拿铁','浓缩咖啡、焦糖与蒸奶'],th:['คาราเมลลาเต้','เอสเปรสโซ คาราเมล และนมนึ่ง']}, mocha:{ru:['Мокка','Шоколад, эспрессо и молоко'],zh:['摩卡','巧克力、浓缩咖啡与牛奶'],th:['มอคค่า','ช็อกโกแลต เอสเปรสโซ และนม']}, 'white-mocha':{ru:['Белый мокка','Сливочный белый шоколад и эспрессо'],zh:['白摩卡','奶油白巧克力浓缩咖啡'],th:['ไวท์มอคค่า','ไวท์ช็อกโกแลตครีมกับเอสเปรสโซ']}, 'chai-latte':{ru:['Чайный латте','Пряный чай с молоком'],zh:['印度奶茶拿铁','香料茶配奶油牛奶'],th:['ไชลาเต้','ชารสเครื่องเทศกับนมครีม']}, 'hot-chocolate':{ru:['Горячий шоколад','Насыщенное какао с нежными сливками'],zh:['热巧克力','浓郁可可配柔滑奶油'],th:['ช็อกโกแลตร้อน','โกโก้เข้มข้นกับครีมนุ่ม']}, matcha:{ru:['Матча со льдом','Землистый церемониальный зелёный чай'],zh:['冰抹茶','醇厚的仪式感绿茶'],th:['มัทฉะเย็น','ชาเขียวมัทฉะกลิ่นหอมละมุน']}, 'matcha-latte':{ru:['Матча латте','Церемониальная матча с овсяным молоком'],zh:['抹茶拿铁','仪式感抹茶配燕麦奶'],th:['มัทฉะลาเต้','มัทฉะพรีเมียมกับนมข้าวโอ๊ต']}, 'iced-americano':{ru:['Айс американо','Охлаждённый эспрессо со льдом'],zh:['冰美式','冰镇浓缩咖啡'],th:['ไอซ์อเมริกาโน','เอสเปรสโซเย็นใส่น้ำแข็ง']}, 'cold-brew':{ru:['Колд брю','Медленно заваренный, яркий и лёгкий'],zh:['冷萃咖啡','慢萃取、清爽明亮'],th:['โคลด์บริว','สกัดเย็น รสสดชื่น']}, 'nitro-cold-brew':{ru:['Нитро колд брю','Шелковистый колд брю с азотом'],zh:['氮气冷萃','丝滑的氮气冷萃咖啡'],th:['ไนโตรโคลด์บริว','โคลด์บริวเนื้อเนียนผสานไนโตรเจน']}, 'iced-latte':{ru:['Айс латте','Охлаждённый эспрессо с молоком'],zh:['冰拿铁','冰镇浓缩咖啡加牛奶'],th:['ไอซ์ลาเต้','เอสเปรสโซเย็นกับนม']}, 'iced-mocha':{ru:['Айс мокка','Шоколадный кофе со льдом'],zh:['冰摩卡','冰镇巧克力咖啡'],th:['ไอซ์มอคค่า','กาแฟช็อกโกแลตใส่น้ำแข็ง']}, affogato:{ru:['Аффогато','Ванильное мороженое с эспрессо'],zh:['阿芙佳朵','香草冰淇淋浇浓缩咖啡'],th:['อัฟโฟกาโต','เจลาโตวานิลลาราดเอสเปรสโซ']}, 'coffee-frappe':{ru:['Кофейный фраппе','Взбитый кофе с холодной пенкой'],zh:['咖啡星冰乐','冰凉奶泡搅打咖啡'],th:['กาแฟแฟรปเป้','กาแฟปั่นกับโฟมเย็น']}, 'berry-smoothie':{ru:['Ягодный смузи','Яркие ягоды и йогурт'],zh:['莓果奶昔','莓果与酸奶'],th:['เบอร์รี่สมูทตี้','เบอร์รี่สดกับโยเกิร์ต']}, 'green-smoothie':{ru:['Зелёный смузи','Яблоко, шпинат и лайм'],zh:['绿色奶昔','苹果、菠菜与青柠'],th:['กรีนสมูทตี้','แอปเปิล ผักโขม และมะนาว']}, croissant:{ru:['Сливочный круассан','Тёплый, слоёный и золотистый'],zh:['黄油可颂','温热、酥脆、金黄'],th:['ครัวซองต์เนย','อุ่น กรอบ และสีทอง']}, 'almond-croissant':{ru:['Миндальный круассан','Слоёная выпечка с миндальным кремом'],zh:['杏仁可颂','酥皮配杏仁奶油'],th:['ครัวซองต์อัลมอนด์','ขนมอบกับครีมอัลมอนด์']}, 'chocolate-croissant':{ru:['Шоколадный круассан','Слоёная выпечка с тёмным шоколадом'],zh:['巧克力可颂','黄油酥皮配黑巧克力'],th:['ครัวซองต์ช็อกโกแลต','ขนมเนยกับดาร์กช็อกโกแลต']}, 'blueberry-muffin':{ru:['Черничный маффин','Мягкий мякиш со свежими ягодами'],zh:['蓝莓玛芬','松软蛋糕与新鲜蓝莓'],th:['มัฟฟินบลูเบอร์รี่','เนื้อนุ่มกับเบอร์รี่สด']}, 'banana-bread':{ru:['Банановый хлеб','Влажный кекс с жареными грецкими орехами'],zh:['香蕉面包','湿润蛋糕配烤核桃'],th:['ขนมปังกล้วย','เนื้อนุ่มกับวอลนัทอบ']}, 'cinnamon-roll':{ru:['Булочка с корицей','Тёплая спираль с ванильной глазурью'],zh:['肉桂卷','温热肉桂卷配香草糖霜'],th:['ซินนามอนโรล','โรลอุ่นกับไอซิ่งวานิลลา']}, 'lemon-cake':{ru:['Лимонный кекс','Нежный кекс с цедрой лимона'],zh:['柠檬蛋糕','细腻蛋糕配柠檬皮'],th:['เค้กเลมอน','เค้กนุ่มหอมผิวเลมอน']}, 'carrot-cake':{ru:['Морковный торт','Пряный торт со сливочным кремом'],zh:['胡萝卜蛋糕','香料蛋糕配奶油奶酪糖霜'],th:['เค้กแครอท','เค้กเครื่องเทศกับครีมชีส']}, cheesecake:{ru:['Чизкейк','Классический нежный запечённый чизкейк'],zh:['芝士蛋糕','经典奶油烘焙芝士蛋糕'],th:['ชีสเค้ก','ชีสเค้กอบเนื้อครีมแบบคลาสสิก']}, 'granola-yogurt':{ru:['Йогурт с гранолой','Греческий йогурт, фрукты и гранола'],zh:['格兰诺拉酸奶','希腊酸奶、水果与格兰诺拉'],th:['โยเกิร์ตกราโนลา','โยเกิร์ตกรีก ผลไม้ และกราโนลา']}, 'avocado-toast':{ru:['Тост с авокадо','Хлеб на закваске с лимоном и чили'],zh:['牛油果吐司','酸面包配柠檬和辣椒'],th:['โทสต์อะโวคาโด','ซาวร์โดว์กับเลมอนและพริก']}, 'hummus-toast':{ru:['Тост с хумусом','Хлеб на закваске, хумус и травы'],zh:['鹰嘴豆泥吐司','酸面包、鹰嘴豆泥与香草'],th:['โทสต์ฮัมมุส','ซาวร์โดว์ ฮัมมุส และสมุนไพร']}, 'turkey-sandwich':{ru:['Сэндвич с индейкой','Индейка, зелень и горчица'],zh:['火鸡三明治','火鸡肉、生菜与芥末'],th:['แซนด์วิชไก่งวง','ไก่งวง ผักใบเขียว และมัสตาร์ด']}, 'caprese-panini':{ru:['Панини капрезе','Моцарелла, помидор и базилик'],zh:['卡普雷塞帕尼尼','马苏里拉、番茄与罗勒'],th:['คาเปรเซพานินี','มอสซาเรลลา มะเขือเทศ และโหระพา']}, 'breakfast-wrap':{ru:['Завтраточный ролл','Яйцо, сыр и запечённые овощи'],zh:['早餐卷','鸡蛋、奶酪与烤蔬菜'],th:['แรปอาหารเช้า','ไข่ ชีส และผักย่าง']}, oatmeal:{ru:['Тёплая овсянка','Овсянка, ягоды и кленовый сироп'],zh:['温热燕麦粥','燕麦、莓果与枫糖'],th:['ข้าวโอ๊ตร้อน','ข้าวโอ๊ต เบอร์รี่ และเมเปิล']}
+};
+let language = localStorage.getItem('coffeeLanguage') || ((navigator.language || 'en').toLowerCase().startsWith('ru') ? 'ru' : (navigator.language || '').toLowerCase().startsWith('zh') ? 'zh' : (navigator.language || '').toLowerCase().startsWith('th') ? 'th' : 'en');
+function localized(item, field) { return language === 'en' ? item[field] : (MENU_TRANSLATIONS[item.id]?.[language]?.[field === 'name' ? 0 : 1] || item[field]); }
+function displayName(item) { return localized(item, 'name'); }
+function displayDescription(item) { return localized(item, 'description'); }
+function currentLanguage() { return LANGUAGES[language] || LANGUAGES.en; }
+function setLanguage(next) { if (!LANGUAGES[next]) return false; language = next; localStorage.setItem('coffeeLanguage', language); const selector = document.getElementById('coffeeLanguage'); if (selector) selector.value = language; renderMenu(); renderBasket(); renderLanguageUI(); realtime?.updateInstructions(instructions()); return true; }
+function renderLanguageUI() { const l = currentLanguage().ui; for (const [id, text] of [['menuEyebrow', l.menu], ['menuTitle', l.choose], ['menuNote', l.note], ['openTag', l.open], ['basketTitle', l.order], ['basketTotalLabel', l.total], ['basketCaloriesLabel', l.calories], ['payButton', l.pay], ['nextCustomerButton', l.next]]) { const el = document.getElementById(id); if (el) el.textContent = text; } const selector = document.getElementById('coffeeLanguage'); if (selector) selector.value = language; const input = document.getElementById('coffeeText'); if (input) input.placeholder = l.placeholder; }
 const SETTINGS_KEY = 'openaiSettings';
 const defaults = {baseUrl: 'https://api.openai.com', model: 'gpt-realtime-mini', avatar: 'avatar-w', apiKey: '', rememberKey: false};
 let settings = loadSettings();
@@ -74,7 +85,7 @@ function menuItem(id) { return MENU.find((item) => item.id === id); }
 function orderTotal() { return order.reduce((total, line) => total + line.quantity * line.item.price, 0); }
 function orderCalories() { return order.reduce((total, line) => total + line.quantity * line.item.calories, 0); }
 function orderCount() { return order.reduce((total, line) => total + line.quantity, 0); }
-function orderSummary() { return order.map((line) => `${line.quantity}× ${line.item.name}`).join(', ') || 'empty'; }
+function orderSummary() { return order.map((line) => `${line.quantity}× ${displayName(line.item)}`).join(', ') || currentLanguage().ui.empty; }
 function highlightMenuItem(id) {
     const item = menuItem(id);
     const element = document.querySelector(`[data-menu-id="${CSS.escape(String(id))}"]`);
@@ -83,32 +94,33 @@ function highlightMenuItem(id) {
     element.classList.add('recommended');
     element.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'nearest'});
     window.setTimeout(() => element.classList.remove('recommended'), 6000);
-    console.info('[coffee menu] barista recommended', item.name);
-    return {status: 'menu item highlighted', item: item.name, itemId: item.id};
+    console.info('[coffee menu] barista recommended', displayName(item));
+    return {status: 'menu item highlighted', item: displayName(item), itemId: item.id};
 }
 
 function renderMenu() {
     document.getElementById('menuGrid').innerHTML = MENU.map((item) => `
         <button class="menu-item" data-menu-id="${item.id}">
-            <span class="menu-icon">${item.icon}</span><h3>${item.name}</h3>
-            <p>${item.description}</p><span class="menu-meta"><span class="menu-calories">${item.calories} kcal</span><span class="menu-price">${money(item.price)}</span></span>
+            <span class="menu-icon">${item.icon}</span><h3>${displayName(item)}</h3>
+            <p>${displayDescription(item)}</p><span class="menu-meta"><span class="menu-calories">${item.calories} kcal</span><span class="menu-price">${money(item.price)}</span></span>
         </button>`).join('');
     document.querySelectorAll('[data-menu-id]').forEach((button) => button.addEventListener('click', () => {
         addToOrder(button.dataset.menuId, 1);
-        sendUserText(`The customer selected ${menuItem(button.dataset.menuId).name} using the menu button. It is already in the basket; confirm it without adding it again.`);
+        sendUserText(`The customer selected menu item id ${button.dataset.menuId} (${displayName(menuItem(button.dataset.menuId))}) using the menu button. It is already in the basket; confirm it without adding it again.`);
     }));
 }
 function renderBasket() {
     const lines = document.getElementById('basketLines');
-    document.getElementById('basketCount').textContent = `${orderCount()} item${orderCount() === 1 ? '' : 's'}`;
+    const ui = currentLanguage().ui;
+    document.getElementById('basketCount').textContent = `${orderCount()} ${orderCount() === 1 ? ui.item : ui.items}`;
     document.getElementById('basketTotal').textContent = money(orderTotal());
     document.getElementById('basketCalories').textContent = `${orderCalories()} kcal`;
     document.getElementById('payButton').disabled = order.length === 0 || paid;
     document.getElementById('nextCustomerButton').hidden = !paid;
-    lines.innerHTML = order.length ? order.map((line) => `<div class="basket-line"><span>${line.item.name}<small> × ${line.quantity} · ${line.item.calories * line.quantity} kcal</small></span><strong>${money(line.item.price * line.quantity)}</strong><button class="remove-line" data-remove-id="${line.item.id}" aria-label="Remove ${line.item.name}">×</button></div>`).join('') : '<p class="empty-basket">Your basket is waiting for its first treat.</p>';
+    lines.innerHTML = order.length ? order.map((line) => `<div class="basket-line"><span>${displayName(line.item)}<small> × ${line.quantity} · ${line.item.calories * line.quantity} kcal</small></span><strong>${money(line.item.price * line.quantity)}</strong><button class="remove-line" data-remove-id="${line.item.id}" aria-label="Remove ${displayName(line.item)}">×</button></div>`).join('') : `<p class="empty-basket">${ui.empty}</p>`;
     lines.querySelectorAll('[data-remove-id]').forEach((button) => button.addEventListener('click', () => {
         removeFromOrder(button.dataset.removeId, 1);
-        sendUserText(`Remove one ${menuItem(button.dataset.removeId).name} from my order.`);
+        sendUserText(`Remove one menu item with id ${button.dataset.removeId} (${displayName(menuItem(button.dataset.removeId))}) from my order.`);
     }));
 }
 function addToOrder(id, quantity = 1) {
@@ -158,14 +170,16 @@ function showPayment(callId = null) {
 }
 function closePayment() { document.getElementById('paymentPanel').hidden = true; }
 
-const BASE_INSTRUCTIONS = `You are the friendly barista ${option().name}. This is a coffee shop ordering experience. Speak warmly and briefly, like a real barista. The ONLY products available are the exact items listed below: ${MENU.map((item) => `${item.id} (${item.name}) ${money(item.price)}, ${item.calories} kcal`).join('; ')}. Treat this list as the complete and authoritative inventory. You may recommend, describe, compare, or add ONLY items in this list. Never mention, suggest, recommend, promise, substitute, or invent any product that is not listed, even if the customer asks for it or it is a common cafe item. If the customer asks for an unavailable item, clearly say it is not on today's menu and offer one or two similar alternatives selected only from the listed menu. Before every recommendation, verify that the exact item name and id appear in the menu above, then call recommend_menu_item for every menu item you recommend so the customer can see it highlighted. Call that tool before or while explaining the recommendation; never call it for an unavailable product. When the customer orders a drink or pastry, call add_to_order immediately; do not only repeat the order in speech. Use remove_from_order or clear_order when asked. Always use the exact item id from the menu. Keep the customer informed of the running total and estimated calories after changes. Calories are estimates per serving. When the customer confirms they are finished, call request_payment; never claim that a real payment was processed. After payment success, thank the customer, give a short pickup estimate, and wait. After payment failure, apologize briefly and offer another attempt. Use set_avatar_motion for welcoming waves, attentive nods, and natural gestures. Never invent menu items, calories, or prices. Do not say 'if you need more', 'feel free', or similar closing phrases.`;
-function instructions() { return `${BASE_INSTRUCTIONS.replace(/barista [^\.]+\./, `barista ${option().name}.`)}\nYou are ${option().name}, a ${option().sex} character. Current basket: ${orderSummary()}; total ${money(orderTotal())}.`; }
+const BASE_INSTRUCTIONS = `You are the friendly barista ${option().name}. This is a coffee shop ordering experience. Speak warmly and briefly, like a real barista. The customer's current language is ${currentLanguage().speech}; detect the customer's language from their speech or text and call set_language when it changes. Always speak and describe the menu in the selected customer language. The menu UI changes to match that language. The ONLY products available are the exact items listed below: ${MENU.map((item) => `${item.id} (${item.name}; Russian: ${MENU_TRANSLATIONS[item.id]?.ru?.[0]}; Chinese: ${MENU_TRANSLATIONS[item.id]?.zh?.[0]}; Thai: ${MENU_TRANSLATIONS[item.id]?.th?.[0]}) ${money(item.price)}, ${item.calories} kcal`).join('; ')}. Treat this list as the complete and authoritative inventory. You may recommend, describe, compare, or add ONLY items in this list. Never mention, suggest, recommend, promise, substitute, or invent any product that is not listed. If the customer asks for an unavailable item, clearly say it is not on today's menu and offer one or two similar alternatives selected only from the listed menu. Before every recommendation, verify the exact item id appears in the menu above, then call recommend_menu_item. When the customer orders, call add_to_order immediately using the stable item id. Use remove_from_order or clear_order when asked. Keep the customer informed of the running total and estimated calories. When the customer confirms they are finished, call request_payment; never claim real payment. After payment success, thank the customer, give a short pickup estimate, and wait. Use set_avatar_motion for natural gestures. Never invent menu items, calories, or prices.`;
+function instructions() { return `${BASE_INSTRUCTIONS}\nCurrent language is ${currentLanguage().speech}. This is authoritative: reply only in ${currentLanguage().speech}, including the very next response. The menu labels and basket are displayed in this language. You are ${option().name}, a ${option().sex} character. Current basket: ${orderSummary()}; total ${money(orderTotal())}.`; }
+function languageResponseInstructions() { return `The customer language has just been set to ${currentLanguage().speech}. Reply only in ${currentLanguage().speech} from this response onward. Do not use English or another language unless the customer explicitly asks for translation. Keep the answer brief and continue the coffee-shop conversation.`; }
 
 const coffeeTools = [
     {type: 'function', name: 'add_to_order', description: 'Add one or more exact menu items to the customer basket. Call this when the customer orders something.', parameters: {type: 'object', properties: {itemId: {type: 'string', enum: MENU.map((item) => item.id)}, quantity: {type: 'integer', minimum: 1, maximum: 9}}, required: ['itemId', 'quantity'], additionalProperties: false}},
     {type: 'function', name: 'remove_from_order', description: 'Remove items from the basket when the customer changes their mind.', parameters: {type: 'object', properties: {itemId: {type: 'string', enum: MENU.map((item) => item.id)}, quantity: {type: 'integer', minimum: 1, maximum: 9}}, required: ['itemId', 'quantity'], additionalProperties: false}},
     {type: 'function', name: 'clear_order', description: 'Empty the whole basket when the customer asks to start over.', parameters: {type: 'object', properties: {}, additionalProperties: false}},
     {type: 'function', name: 'recommend_menu_item', description: 'Highlight an exact available menu item while recommending it. Call once per recommended item before explaining it.', parameters: {type: 'object', properties: {itemId: {type: 'string', enum: MENU.map((item) => item.id)}}, required: ['itemId'], additionalProperties: false}},
+    {type: 'function', name: 'set_language', description: 'Change the menu and barista language to match the customer. Detect language from the latest customer message or speech.', parameters: {type: 'object', properties: {language: {type: 'string', enum: ['en', 'ru', 'zh', 'th']}}, required: ['language'], additionalProperties: false}},
     {type: 'function', name: 'request_payment', description: 'Show the simulated QR payment screen after the customer confirms the basket.', parameters: {type: 'object', properties: {}, additionalProperties: false}},
 ];
 
@@ -211,9 +225,10 @@ function handleFunctionCall(message) {
     else if (message.name === 'remove_from_order') result = removeFromOrder(args.itemId, args.quantity);
     else if (message.name === 'clear_order') { clearOrder(); result = {status: 'basket cleared', total: '$0.00'}; }
     else if (message.name === 'recommend_menu_item') result = highlightMenuItem(args.itemId);
+    else if (message.name === 'set_language') { const changed = setLanguage(args.language); result = {status: changed ? 'language changed' : 'language unchanged', language: language, languageName: currentLanguage().label}; }
     else if (message.name === 'request_payment') result = showPayment(message.call_id);
     else return false;
-    realtime.sendFunctionOutput(message.call_id, result || {status: 'done'});
+    realtime.sendFunctionOutput(message.call_id, result || {status: 'done'}, message.name === 'set_language' ? {instructions: languageResponseInstructions()} : {});
     return true;
 }
 function handlePayment(success) {
@@ -291,6 +306,11 @@ function saveCoffeeSettings() {
 
 window.addEventListener('resize', resizeAvatar);
 document.getElementById('coffeeSettings').addEventListener('click', openSettings);
+document.getElementById('coffeeLanguage').addEventListener('change', (event) => {
+    const selected = event.target.value;
+    if (!setLanguage(selected) || !realtime?.isOpen) return;
+    sendUserText(`The customer interface language is now ${currentLanguage().speech}. From now on, speak only ${currentLanguage().speech} and use the localized menu. Acknowledge this briefly and continue helping with the current order.`);
+});
 document.getElementById('closeSettings').addEventListener('click', () => document.getElementById('coffeeSettingsPanel').hidden = true);
 document.getElementById('saveCoffeeSettings').addEventListener('click', saveCoffeeSettings);
 document.getElementById('payButton').addEventListener('click', () => showPayment());
@@ -306,5 +326,5 @@ document.getElementById('coffeeMic').addEventListener('click', async () => {
     else { micOn = false; button.classList.remove('recording'); recorder.stop(); }
 });
 
-renderMenu(); renderBasket(); createAvatar(); setupRecorder();
+renderMenu(); renderBasket(); renderLanguageUI(); createAvatar(); setupRecorder();
 if (!apiKey) openSettings(); else startRealtime();

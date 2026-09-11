@@ -286,7 +286,7 @@ export class RealtimeClient {
         return true;
     }
 
-    sendFunctionOutput(callId, output = 'ok', {silent = false} = {}) {
+    sendFunctionOutput(callId, output = 'ok', {silent = false, instructions = null} = {}) {
         if (!this.isOpen || !callId) return;
         this.sendEvent({
             event_id: this._nextEventId(),
@@ -297,10 +297,10 @@ export class RealtimeClient {
                 output: typeof output === 'string' ? output : JSON.stringify(output),
             },
         });
-        this.requestResponse(silent ? {
-            output_modalities: ['text'],
-            instructions: 'Do not speak. Finish the camera-tracking tool turn silently.',
-        } : {});
+        const response = silent
+            ? {output_modalities: ['text'], instructions: 'Do not speak. Finish the camera-tracking tool turn silently.'}
+            : (instructions ? {instructions} : {});
+        this.requestResponse(response);
     }
 
     appendInputAudioBase64(audioBase64) {
