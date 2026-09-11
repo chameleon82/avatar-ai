@@ -16,7 +16,8 @@ export class Avatar {
 
         this.camera = new THREE.PerspectiveCamera(6, window.innerWidth / window.innerHeight, 0.01, 100);
         this.camera.position.set(0, 2.0, 5);
-        this.camera.lookAt(new THREE.Vector3(0, 1.6, 0));
+        // Keep the avatar slightly below center so the top of the head is not clipped.
+        this.camera.lookAt(new THREE.Vector3(0, 1.8, 0));
 
         this.renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
         // Enable shadows in the renderer
@@ -83,8 +84,18 @@ export class Avatar {
                         clz.wolfAvatar.morphTargetInfluences[clz.wolfAvatar.morphTargetDictionary.mouthSmile] = 0.3
                     }
                 });
-                model.position.set(0, 0, 0);
-                model.scale.set(1, 1, 1);
+                // Avatar files can use different local origins and scales. Normalize their
+                // feet, horizontal center, and height so every selection uses the same frame.
+                const bounds = new THREE.Box3().setFromObject(model);
+                const size = bounds.getSize(new THREE.Vector3());
+                const targetHeight = 2.0;
+                if (size.y > 0.001) {
+                    const frameScale = targetHeight / size.y;
+                    model.scale.setScalar(frameScale);
+                }
+                const framedBounds = new THREE.Box3().setFromObject(model);
+                const framedCenter = framedBounds.getCenter(new THREE.Vector3());
+                model.position.set(-framedCenter.x, -framedBounds.min.y, -framedCenter.z);
 
                 model.traverse((child) => {
                     if (child.isMesh && child.material.map) {
@@ -134,6 +145,7 @@ export class Avatar {
 
 
     animate() {
+        if (this.disposed) return;
         const clz = this
         requestAnimationFrame(function () {
             clz.animate()
@@ -214,6 +226,12 @@ export class Avatar {
 
     setSleep(bool) {
         this.isSleep = bool
+    }
+
+    dispose() {
+        this.disposed = true;
+        if (this.mixer) this.mixer.stopAllAction();
+        if (this.renderer) this.renderer.dispose();
     }
 
 }
