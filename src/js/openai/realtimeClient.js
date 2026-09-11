@@ -72,21 +72,28 @@ export class RealtimeClient {
                     event_id: this._nextEventId(),
                     type: 'session.update',
                     session: {
-                        modalities: ['text', 'audio'],
+                        // Current Realtime API session schema.
+                        type: 'realtime',
+                        output_modalities: ['audio'],
                         instructions: this.buildInstructions ? this.buildInstructions() : '',
-                        voice: this.voice,
-                        input_audio_format: 'pcm16',
-                        output_audio_format: 'pcm16',
-                        turn_detection: this.turnDetection || {
-                            type: 'server_vad',
-                            threshold: 0.5,
-                            prefix_padding_ms: 300,
-                            silence_duration_ms: 500,
-                            create_response: true,
+                        audio: {
+                            input: {
+                                format: {type: 'audio/pcm', rate: 24000},
+                                turn_detection: this.turnDetection || {
+                                    type: 'server_vad',
+                                    threshold: 0.5,
+                                    prefix_padding_ms: 300,
+                                    silence_duration_ms: 500,
+                                    create_response: true,
+                                },
+                            },
+                            output: {
+                                format: {type: 'audio/pcm', rate: 24000},
+                                voice: this.voice,
+                            },
                         },
                         tool_choice: 'auto',
-                        temperature: 0.8,
-                        max_response_output_tokens: 'inf',
+                        max_output_tokens: 'inf',
                     },
                 };
 
@@ -100,17 +107,20 @@ export class RealtimeClient {
         this.socket.onmessage = (event) => {
             try {
                 const msg = JSON.parse(event.data);
+                if (this.debug) console.debug('[realtime] received:', msg);
                 if (this.onMessage) this.onMessage(msg);
             } catch (e) {
-                // ignore parse errors
+                console.error('[realtime] invalid server message:', event.data, e);
             }
         };
 
-        this.socket.onclose = () => {
-            if (this.onClose) this.onClose();
+        this.socket.onclose = (event) => {
+            if (this.debug) console.debug('[realtime] closed:', event.code, event.reason);
+            if (this.onClose) this.onClose(event);
         };
 
         this.socket.onerror = (err) => {
+            console.error('[realtime] WebSocket error:', err);
             if (this.onError) this.onError(err);
         };
     }
@@ -140,7 +150,10 @@ export class RealtimeClient {
         this.sendEvent({
             event_id: this._nextEventId(),
             type: 'session.update',
-            session: sessionPatch,
+            session: {
+                type: 'realtime',
+                ...sessionPatch,
+            },
         });
     }
 
@@ -167,6 +180,7 @@ export class RealtimeClient {
     sendText(text) {
         if (!this.isOpen) return;
         this.sendEvent({
+            event_id: this._nextEventId(),
             type: 'conversation.item.create',
             previous_item_id: null,
             item: {
@@ -175,6 +189,9 @@ export class RealtimeClient {
                 content: [{type: 'input_text', text}],
             },
         });
-        this.sendEvent({type: 'response.create'});
+        this.sendEvent({
+            event_id: this._nextEventId(),
+            type: 'response.create',
+        });
     }
 }
