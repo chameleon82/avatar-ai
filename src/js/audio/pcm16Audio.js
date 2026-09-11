@@ -68,6 +68,15 @@ export class PCM16Audio {
         return this.outputGain;
     }
 
+    // Browsers usually create AudioContext in the "suspended" state until a
+    // user gesture resumes it. Realtime responses can arrive after that
+    // gesture, so resume playback explicitly before sending a request.
+    async resumePlayback() {
+        if (this.playAudioContext.state === 'suspended') {
+            await this.playAudioContext.resume();
+        }
+    }
+
     createOutputAnalyser({
         fftSize,
         smoothingTimeConstant,

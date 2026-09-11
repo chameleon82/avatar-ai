@@ -7,6 +7,7 @@ import {RealtimeClient} from './openai/realtimeClient.js';
 let avatar = new Avatar("./src/assets/avatar-w.glb");
 // let avatar = new Avatar("https://readyplayerme.github.io/visage/male.glb");
 let realtimeClient = null;
+let pendingText = [];
 
 // ---- Prevent device sleep while this page is open (Screen Wake Lock) ----
 // Notes:
@@ -455,9 +456,18 @@ function initAI() {
         model: settings.model,
         apiKey: openaiApiKey,
         buildInstructions,
-        onOpen: () => {
+        onOpen: async () => {
+            try {
+                await recorder.resumePlayback();
+            } catch (error) {
+                console.warn('[audio] unable to resume playback', error);
+            }
             avatar.setSleep(false);
             console.debug('Connected to OpenAI WebSocket');
+
+            // Preserve text submitted while the socket was connecting.
+            const queued = pendingText.splice(0);
+            for (const text of queued) realtimeClient.sendText(text);
         },
         onClose: () => {
             avatar.setSleep(true);
@@ -466,6 +476,15 @@ function initAI() {
         },
         onError: (error) => console.error('WebSocket Error:', error),
         onMessage: (response) => {
+            // Keep the event stream visible while diagnosing a connected-but-silent avatar.
+            if (response["type"] !== 'response.audio.delta' && response["type"] !== 'response.output_audio.delta') {
+                console.debug('[realtime] event:', response["type"], response);
+            }
+
+            if (response["type"] === 'error') {
+                console.error('[realtime] server error:', response.error || response);
+                return;
+            }
             if (response["type"] === "input_audio_buffer.speech_started" || response["type"] === "speech_started") {
                 startCameraCapture();
                 return;
@@ -479,14 +498,29 @@ function initAI() {
                 return;
             }
 
-            if (response["type"] === "response.audio_transcript.done" && response["transcript"]) {
+            // The current API uses response.output_audio_transcript.done;
+            // retain the older event name for compatible/proxy endpoints.
+            if (
+                (response["type"] === "response.output_audio_transcript.done" ||
+                 response["type"] === "response.audio_transcript.done") &&
+                response["transcript"]
+            ) {
                 appendHistoryItem({role: 'assistant', text: response["transcript"]});
                 return;
             }
 
-            if (response["type"] === "response.audio.delta") {
-                const binaryData = atob(response["delta"]);
-                recorder.addPlayChunk(PCM16Audio.bytesToPcm(binaryData));
+            // GA Realtime uses response.output_audio.delta. Older endpoints used
+            // response.audio.delta. Both contain base64 PCM16 audio in `delta`.
+            if (
+                response["type"] === "response.output_audio.delta" ||
+                response["type"] === "response.audio.delta"
+            ) {
+                try {
+                    const binaryData = atob(response["delta"]);
+                    recorder.addPlayChunk(PCM16Audio.bytesToPcm(binaryData));
+                } catch (error) {
+                    console.error('[audio] unable to play realtime audio delta', error);
+                }
             }
         },
         turnDetection: {
@@ -497,6 +531,7 @@ function initAI() {
             create_response: true,
         },
         voice: 'sage',
+        debug: true,
     });
 
     realtimeClient.connect();
@@ -507,10 +542,16 @@ async function onUserInput(input) {
     if (!text) return;
 
     appendHistoryItem({role: 'user', text});
+    try {
+        await recorder.resumePlayback();
+    } catch (error) {
+        console.warn('[audio] unable to resume playback', error);
+    }
 
     if (realtimeClient && realtimeClient.isOpen) {
         realtimeClient.sendText(text);
     } else {
+        pendingText.push(text);
         initAI();
     }
 }
